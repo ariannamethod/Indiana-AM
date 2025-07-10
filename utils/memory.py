@@ -25,7 +25,7 @@ class MemoryManager:
         )
         self.db.commit()
 
-    async def retrieve(self, user_id: str, query: str) -> str:
+    async def retrieve(self, user_id: str) -> str:
         cur = self.db.execute(
             "SELECT response FROM memory WHERE user_id=? ORDER BY timestamp DESC LIMIT 5",
             (user_id,)

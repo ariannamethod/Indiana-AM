@@ -141,7 +141,7 @@ async def delayed_followup(chat_id: int, user_id: str, original: str, private: b
     await asyncio.sleep(delay)
     prompt = f"#followup\nRemind me about: {original}"
     # Include saved memory
-    context = await memory.retrieve(user_id, original)
+    context = await memory.retrieve(user_id)
     text = await query_sonar(prompt, context)
     for chunk in split_message(text):
         await bot.send_message(chat_id, chunk)
@@ -149,7 +149,7 @@ async def delayed_followup(chat_id: int, user_id: str, original: str, private: b
 async def afterthought(chat_id: int, user_id: str, original: str, private: bool):
     await asyncio.sleep(random.uniform(3600, 7200))
     prompt = f"#afterthought\nI've been thinking about: {original}"
-    context = await memory.retrieve(user_id, original)
+    context = await memory.retrieve(user_id)
     text = await query_sonar(prompt, ARTIFACTS_TEXT + "\n" + context)
     entry = {"time": datetime.utcnow().isoformat(), "user": user_id, "afterthought": text}
     save_note(entry)
@@ -170,7 +170,7 @@ async def handle_message(m: types.Message):
     await asyncio.sleep(random.uniform(10,40) if private else random.uniform(120,360))
 
     # 1) Load context from memory and artifacts
-    mem_ctx = await memory.retrieve(user_id, text)
+    mem_ctx = await memory.retrieve(user_id)
     system_ctx = ARTIFACTS_TEXT + "\n" + mem_ctx
 
     # 2) Main request to Perplexity reasoning core
