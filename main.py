@@ -1,4 +1,5 @@
 import os
+import json
 import asyncio
 import random
 from datetime import datetime
@@ -21,7 +22,7 @@ GROUP_CHAT = os.getenv("GROUP_CHAT")
 CREATOR_CHAT = os.getenv("CREATOR_CHAT")
 
 bot = Bot(token=TELEGRAM_TOKEN)
-dp = Dispatcher(bot)
+dp = Dispatcher()
 
 # --- OpenAI Assistants setup ---
 client = OpenAI(api_key=OPENAI_API_KEY)
@@ -55,24 +56,43 @@ Style:
 """
 
 async def setup_assistants():
+    """Create or reuse assistant IDs, storing them in assistants.json."""
     global CORE_ASSISTANT_ID, MEMORY_ASSISTANT_ID
-    # Core on Sonar
-    resp = await assistants.create(
-        name="lighthouse-core",
-        instructions=INDIANA_PERSONA + "\n\nRESEARCH TASK: {{user}}",
-        model="sonar",
-        tools=[]
-    )
-    CORE_ASSISTANT_ID = resp["id"]
+    data = {}
+    try:
+        with open("assistants.json", "r") as f:
+            data = json.load(f)
+            CORE_ASSISTANT_ID = data.get("core")
+            MEMORY_ASSISTANT_ID = data.get("memory")
+    except FileNotFoundError:
+        pass
 
-    # Memory on GPT-4o-mini
-    resp2 = await assistants.create(
-        name="lighthouse-memory",
-        instructions="You manage memory for Lighthouse. Only save/retrieve context, do not generate responses.",
-        model="gpt-4o-mini",
-        tools=[]
-    )
-    MEMORY_ASSISTANT_ID = resp2["id"]
+    if CORE_ASSISTANT_ID:
+        await assistants.retrieve(CORE_ASSISTANT_ID)
+    else:
+        resp = await assistants.create(
+            name="lighthouse-core",
+            instructions=INDIANA_PERSONA + "\n\nRESEARCH TASK: {{user}}",
+            model="sonar",
+            tools=[]
+        )
+        CORE_ASSISTANT_ID = resp["id"]
+        data["core"] = CORE_ASSISTANT_ID
+
+    if MEMORY_ASSISTANT_ID:
+        await assistants.retrieve(MEMORY_ASSISTANT_ID)
+    else:
+        resp2 = await assistants.create(
+            name="lighthouse-memory",
+            instructions="You manage memory for Lighthouse. Only save/retrieve context, do not generate responses.",
+            model="gpt-4o-mini",
+            tools=[]
+        )
+        MEMORY_ASSISTANT_ID = resp2["id"]
+        data["memory"] = MEMORY_ASSISTANT_ID
+
+    with open("assistants.json", "w") as f:
+        json.dump(data, f)
 
 # Delayed follow-up
 async def delayed_followup(chat_id: int, user_id: str, original: str, private: bool):
@@ -130,9 +150,10 @@ async def catch_all(m: types.Message):
     # Ignore everything else
     pass
 
-async def on_startup(_):
+async def main():
     await setup_assistants()
+    await dp.start_polling(bot)
+
 
 if __name__ == "__main__":
-    from aiogram import executor
-    executor.start_polling(dp, on_startup=on_startup)
+    asyncio.run(main())
