@@ -192,6 +192,7 @@ async def handle_message(m: types.Message):
 
 async def main():
     await setup_assistants()
+    await memory.init()
     await dp.start_polling(bot)
 
 
