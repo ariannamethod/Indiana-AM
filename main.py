@@ -3,6 +3,7 @@ import json
 import asyncio
 import random
 from datetime import datetime
+from pathlib import Path
 from aiogram import Bot, Dispatcher, types
 from aiogram.utils.chat_action import ChatActionSender
 from openai import OpenAI
@@ -21,6 +22,9 @@ AGENT_GROUP = os.getenv("AGENT_GROUP_ID", "-1001234567890")
 GROUP_CHAT = os.getenv("GROUP_CHAT")
 CREATOR_CHAT = os.getenv("CREATOR_CHAT")
 
+ARTIFACTS_DIR = Path("artefacts")
+NOTES_FILE = Path("notes/journal.json")
+
 bot = Bot(token=TELEGRAM_TOKEN)
 dp = Dispatcher()
 
@@ -33,6 +37,27 @@ CORE_ASSISTANT_ID = None
 MEMORY_ASSISTANT_ID = None
 
 memory = MemoryManager(db_path="lighthouse_memory.db")
+AFTERTHOUGHT_CHANCE = 0.1
+
+def load_artifacts() -> str:
+    """Concatenate all text files from artefacts directory."""
+    texts = []
+    if ARTIFACTS_DIR.exists():
+        for p in ARTIFACTS_DIR.iterdir():
+            if p.is_file():
+                try:
+                    texts.append(p.read_text())
+                except Exception:
+                    continue
+    return "\n".join(texts)
+
+ARTIFACTS_TEXT = load_artifacts()
+
+def save_note(entry: dict):
+    NOTES_FILE.parent.mkdir(exist_ok=True)
+    with NOTES_FILE.open("a") as f:
+        json.dump(entry, f)
+        f.write("\n")
 
 # Indiana's Persona
 INDIANA_PERSONA = """
@@ -73,7 +98,7 @@ async def setup_assistants():
         resp = await assistants.create(
             name="lighthouse-core",
             instructions=INDIANA_PERSONA + "\n\nRESEARCH TASK: {{user}}",
-            model="sonar",
+            model="perplexity/sonar-small-chat",
             tools=[]
         )
         CORE_ASSISTANT_ID = resp["id"]
@@ -96,7 +121,7 @@ async def setup_assistants():
 
 # Delayed follow-up
 async def delayed_followup(chat_id: int, user_id: str, original: str, private: bool):
-    delay = random.uniform(30,60) if private else random.uniform(300,900)
+    delay = random.uniform(10,40) if private else random.uniform(120,360)
     await asyncio.sleep(delay)
     prompt = f"#followup\nRemind me about: {original}"
     # Include saved memory
@@ -112,19 +137,43 @@ async def delayed_followup(chat_id: int, user_id: str, original: str, private: b
     for chunk in split_message(text):
         await bot.send_message(chat_id, chunk)
 
-@dp.message(lambda m: "dynamics" in m.text.lower() or "investigate" in m.text.lower())
-async def handle_investigation(m: types.Message):
+async def afterthought(chat_id: int, user_id: str, original: str, private: bool):
+    await asyncio.sleep(random.uniform(3600, 7200))
+    prompt = f"#afterthought\nI've been thinking about: {original}"
+    context = await memory.retrieve(user_id, original)
+    msgs = [{"role":"system","content":ARTIFACTS_TEXT + "\n" + context},
+            {"role":"user","content":prompt}]
+    resp = await assistants.chat.completions.create(
+        assistant_id=CORE_ASSISTANT_ID,
+        messages=msgs,
+        temperature=0.8,
+    )
+    text = resp.choices[0].message.content
+    entry = {"time": datetime.utcnow().isoformat(), "user": user_id, "afterthought": text}
+    save_note(entry)
+    for chunk in split_message(text):
+        await bot.send_message(chat_id, chunk)
+
+@dp.message()
+async def handle_message(m: types.Message):
+    text = m.text or ""
+    if len(text.strip()) < 4 or ("?" not in text and len(text.split()) <= 2):
+        if random.random() < 0.9:
+            return
     user_id = str(m.from_user.id)
     chat_id = m.chat.id
     private = m.chat.type == "private"
 
-    # 1) Load context from memory
-    mem_ctx = await memory.retrieve(user_id, m.text)
+    await asyncio.sleep(random.uniform(10,40) if private else random.uniform(120,360))
+
+    # 1) Load context from memory and artifacts
+    mem_ctx = await memory.retrieve(user_id, text)
+    system_ctx = ARTIFACTS_TEXT + "\n" + mem_ctx
 
     # 2) Main request to Core assistant
     msgs = [
-        {"role":"system","content":mem_ctx},
-        {"role":"user","content": m.text}
+        {"role":"system","content":system_ctx},
+        {"role":"user","content": text}
     ]
     async with ChatActionSender(bot=bot, chat_id=chat_id, action="typing"):
         resp = await assistants.chat.completions.create(
@@ -135,20 +184,19 @@ async def handle_investigation(m: types.Message):
         )
     reply = resp.choices[0].message.content
 
-    # 3) Save to memory
-    await memory.save(user_id, m.text, reply)
+    # 3) Save to memory and notes
+    await memory.save(user_id, text, reply)
+    save_note({"time": datetime.utcnow().isoformat(), "user": user_id, "query": text, "response": reply})
 
     # 4) Send response
     for chunk in split_message(reply):
         await m.answer(chunk)
 
     # 5) Schedule follow-up
-    asyncio.create_task(delayed_followup(chat_id, user_id, m.text, private))
+    asyncio.create_task(delayed_followup(chat_id, user_id, text, private))
+    if random.random() < AFTERTHOUGHT_CHANCE:
+        asyncio.create_task(afterthought(chat_id, user_id, text, private))
 
-@dp.message()
-async def catch_all(m: types.Message):
-    # Ignore everything else
-    pass
 
 async def main():
     await setup_assistants()
