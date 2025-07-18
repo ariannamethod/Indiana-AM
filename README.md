@@ -136,6 +136,52 @@ Apache License 2.0 — because archaeology of consciousness should stay open.
 
 Happy digging, Oleg — let Indiana resonate!
 
+## 8. Recent additions
+
+Indiana-AM has grown several helper modules that run quietly in the background. The
+`dayandnight` task checks once a day whether a short reflection was stored in the
+vector memory. If not, it asks OpenAI to produce a brief diary-style summary and
+saves it so that even periods of silence are captured.
+
+The `knowtheworld` utility expands on this idea by fetching daily news from the
+web and relating the headlines back to previous conversations. It creates a short
+insight explaining how world events might connect to the ongoing discussions. The
+result is embedded and stored with a `#knowtheworld` tag, giving Indiana a slow but
+steady sense of global awareness.
+
+`VectorStore` wraps the Pinecone API and handles embedding texts through OpenAI.
+It powers fuzzy search across artefacts and memory snippets. `MemoryManager`
+keeps a SQLite log of every exchange and can optionally mirror it in the vector
+store for semantic lookup. Together these utilities allow the bot to reference
+older chats or documents by meaning rather than exact phrasing.
+
+In `main.py` the Telegram bot now supports both webhook and polling modes. On
+startup the assistant profile is created or loaded automatically and two
+background tasks are launched: one for the daily diary entry and another for the
+world-news scan. Messages are processed through the OpenAI Assistant API using
+the accumulated context from memory and artefacts so replies stay consistent and
+personalised.
+
+Smaller helpers such as `split_message` ensure long responses are divided into
+chunks that fit Telegram limits, while the updated environment file makes it
+clear which API keys are required. Overall, these additions aim to keep Indiana
+active and informed even without constant user interaction.
+
+## 9. Areas for improvement
+
+* **Testing and CI** – the project lacks automated tests and continuous
+  integration. Introducing unit tests for the utilities and bot logic would catch
+  regressions early.
+* **Robust error handling** – network calls to OpenAI or Pinecone could be
+  wrapped with retries and clearer logging to simplify debugging.
+* **Configuration management** – environment variables are used directly in the
+  code. A dedicated configuration module or typed settings library would help
+  validate values and provide defaults.
+* **Documentation structure** – the huge list of sources might be moved to a
+  separate document to keep the main README concise. A short architecture
+  overview diagram could also aid newcomers.
+
+
 ## Sources
 [1] Arianna-1.1-MT-7.0-Anchor-Protocol.txt https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/59222190/b16557de-3e8d-4674-af85-c43a54f31380/Arianna-1.1-MT-7.0-Anchor-Protocol.txt
 [2] The Intersection of Artificial Intelligence and Consciousness Research https://www.neuroba.com/post/the-intersection-of-artificial-intelligence-and-consciousness-research-neuroba
