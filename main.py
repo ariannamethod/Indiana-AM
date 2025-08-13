@@ -42,6 +42,8 @@ from utils.aml_terminal import terminal
 from utils.rawthinking import synthesize_final
 from indiana_b import badass_indiana_chat
 from indiana_c import light_indiana_chat, light_indiana_chat_openrouter
+from indiana_d import techno_indiana_chat
+from indiana_g import gravity_indiana_chat
 from GENESIS_orchestrator import update_and_train, report_entropy
 
 # Настройка логгера
@@ -925,6 +927,8 @@ async def handle_message(m: types.Message):
         if user_id in RAW_THINKING_USERS and not text.startswith("/"):
             b_task = asyncio.create_task(badass_indiana_chat(text, lang))
             c_task = asyncio.create_task(light_indiana_chat(text, lang))
+            d_task = asyncio.create_task(techno_indiana_chat(text, lang))
+            g_task = asyncio.create_task(gravity_indiana_chat(text, lang))
 
             summary_prompt = (
                 f"Summarise the following question in one sentence: {text}"
@@ -933,9 +937,23 @@ async def handle_message(m: types.Message):
                 summary = await process_with_assistant(summary_prompt, "", lang)
             except Exception:
                 summary = text
-            call_text = (
-                "Indiana-B и Indiana-C, что скажете?" if lang == "ru" else "Indiana-B and Indiana-C, what do you think?"
-            )
+            call_phrases = {
+                "ru": [
+                    "Что скажете на это?",
+                    "Какие мысли?",
+                    "Давайте разберёмся.",
+                    "Что можно добавить?",
+                    "Как подойти к вопросу?",
+                ],
+                "en": [
+                    "What do you think?",
+                    "Any thoughts on this?",
+                    "Shall we break it down?",
+                    "How would you approach it?",
+                    "What can be said about it?",
+                ],
+            }
+            call_text = random.choice(call_phrases.get(lang, call_phrases["en"]))
 
             async with ChatActionSender(bot=bot, chat_id=chat_id, action="typing"):
                 await asyncio.sleep(random.uniform(5, 10))
@@ -970,8 +988,32 @@ async def handle_message(m: types.Message):
                 )
 
             async with ChatActionSender(bot=bot, chat_id=chat_id, action="typing"):
+                await asyncio.sleep(random.uniform(3, 7))
+                d_resp = None
+                try:
+                    d_resp = await d_task
+                except Exception as e:
+                    logger.error("Indiana-D failed: %s", e)
+            if d_resp:
+                await send_split_message(
+                    bot, chat_id=chat_id, text=f"Indiana-D\n{d_resp}"
+                )
+
+            async with ChatActionSender(bot=bot, chat_id=chat_id, action="typing"):
+                await asyncio.sleep(random.uniform(2, 5.5))
+                g_resp = None
+                try:
+                    g_resp = await g_task
+                except Exception as e:
+                    logger.error("Indiana-G failed: %s", e)
+            if g_resp:
+                await send_split_message(
+                    bot, chat_id=chat_id, text=f"Indiana-G\n{g_resp}"
+                )
+
+            async with ChatActionSender(bot=bot, chat_id=chat_id, action="typing"):
                 await asyncio.sleep(random.uniform(3, 8))
-                final = await synthesize_final(text, b_resp, c_resp, lang)
+                final = await synthesize_final(text, b_resp, c_resp, d_resp, g_resp, lang)
             final = await assemble_final_reply(text, final, lang)
             await send_split_message(bot, chat_id=chat_id, text=final)
 

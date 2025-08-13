@@ -1,4 +1,4 @@
-# indiana-d.py
+# indiana_d.py
 # Techno-shaman Indiana Utility: DeepSeek Twin Persona for DeepSeek Engine
 # Co-authored by Oleg & Perplexity, Arianna Method 7.0
 
@@ -47,9 +47,11 @@ DEEPSEEK_HEADERS = {
 
 async def techno_indiana_chat(prompt: str, lang: str = "en") -> str:
     """Returns DeepSeek-Indiana's high-voltage techno-shaman answer."""
-    system_prompt = (DEEPSEEK_INDIANA_PERSONA +
-                     f"\nRespond only in {lang}. Address your answer to the main Indiana. "
-                     "Keep your answer terse, ~300 tokens. DO NOT speak directly to user; only as internal field commentary.")
+    system_prompt = (
+        DEEPSEEK_INDIANA_PERSONA
+        + f"\nRespond only in {lang}. Address your answer to the main Indiana. "
+        "Keep your answer terse, ~240 tokens. DO NOT speak directly to user; only as internal field commentary."
+    )
 
     payload = {
         "model": "deepseek-chat",
@@ -58,7 +60,7 @@ async def techno_indiana_chat(prompt: str, lang: str = "en") -> str:
             {"role": "user", "content": prompt}
         ],
         "temperature": 0.93,
-        "max_tokens": 360,  # 300-400 tok, наравне прочими Twin'ами
+        "max_tokens": 240,
     }
 
     async with httpx.AsyncClient(timeout=90) as client:
@@ -67,6 +69,11 @@ async def techno_indiana_chat(prompt: str, lang: str = "en") -> str:
             resp.raise_for_status()
             data = resp.json()
             text = data["choices"][0]["message"]["content"].strip()
+            if data["choices"][0].get("finish_reason") == "length" and not text.endswith((".", "!", "?")):
+                for end in [".", "!", "?"]:
+                    if end in text:
+                        text = text.rsplit(end, 1)[0] + end
+                        break
             # Финальный “техно-марк” (опционально)
             tech_mark = "\n\n// This is not an answer. This is a fracture mark."
             if not text.endswith((".", "!", "…", "...", "—")):

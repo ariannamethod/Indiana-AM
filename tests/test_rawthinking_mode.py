@@ -42,7 +42,13 @@ async def test_rawthinking_chain(monkeypatch):
     async def fake_light(*a, **k):
         return "C thoughts"
 
-    async def fake_synth(prompt, b, c, lang):
+    async def fake_techno(*a, **k):
+        return "D thoughts"
+
+    async def fake_gravity(*a, **k):
+        return "G thoughts"
+
+    async def fake_synth(prompt, b, c, d, g, lang):
         return "final answer"
 
     async def fake_assemble(prompt, draft, lang):
@@ -63,6 +69,8 @@ async def test_rawthinking_chain(monkeypatch):
     monkeypatch.setattr(main, "genesis6_report", fake_genesis6_report)
     monkeypatch.setattr(main, "badass_indiana_chat", fake_badass)
     monkeypatch.setattr(main, "light_indiana_chat", fake_light)
+    monkeypatch.setattr(main, "techno_indiana_chat", fake_techno)
+    monkeypatch.setattr(main, "gravity_indiana_chat", fake_gravity)
     monkeypatch.setattr(main, "synthesize_final", fake_synth)
     monkeypatch.setattr(main, "assemble_final_reply", fake_assemble)
     monkeypatch.setattr(main, "memory", SimpleNamespace(save=fake_memory_save))
@@ -83,13 +91,16 @@ async def test_rawthinking_chain(monkeypatch):
             return False
 
     monkeypatch.setattr(main, "ChatActionSender", DummyChatActionSender)
+    monkeypatch.setattr(main.random, "choice", lambda seq: seq[0])
 
     await main.handle_message(m)
 
     assert m.answers == [
-        "summary\n\nIndiana-B and Indiana-C, what do you think?",
+        "summary\n\nWhat do you think?",
         "Indiana-B\nB thoughts",
         "Indiana-C\nC thoughts",
+        "Indiana-D\nD thoughts",
+        "Indiana-G\nG thoughts",
         "final answer",
     ]
     main.RAW_THINKING_USERS.clear()
