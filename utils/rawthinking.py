@@ -18,11 +18,14 @@ client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY) if settings.OPENAI_API_KEY
 LOG_FILE = Path("/arianna_core/log/rawthinking.log")
 
 
-async def run_rawthinking(prompt: str, lang: str) -> str:
+async def run_rawthinking(prompt: str, lang: str) -> tuple[str, str | None, str | None]:
     """Run Indiana-B, Indiana-C, and synthesise a final answer.
 
-    Even if one of the sub-agents fails, a final answer is produced from the
-    available responses without exposing errors to the caller.
+    Returns a tuple ``(final, b_resp, c_resp)`` where ``final`` is the main
+    Indiana's reply (already passed through ``genesis2_sonar_filter``) and the
+    other elements contain raw responses from Indiana-B and Indiana-C. Even if
+    one of the sub-agents fails, a final answer is produced from the available
+    responses without exposing errors to the caller.
     """
     b_resp = c_resp = None
 
@@ -82,4 +85,4 @@ async def run_rawthinking(prompt: str, lang: str) -> str:
     except Exception as e:
         logger.error("Failed to log rawthinking: %s", e)
 
-    return final_resp
+    return final_resp, b_resp, c_resp

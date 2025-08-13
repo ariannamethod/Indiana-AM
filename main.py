@@ -933,7 +933,15 @@ async def handle_message(m: types.Message):
             )
             await m.answer(f"{summary}\n\n{call_text}")
             async with ChatActionSender(bot=bot, chat_id=chat_id, action="typing"):
-                final = await run_rawthinking(text, lang)
+                final, b_resp, c_resp = await run_rawthinking(text, lang)
+            if b_resp:
+                await send_split_message(
+                    bot, chat_id=chat_id, text=f"Indiana-B → {b_resp}"
+                )
+            if c_resp:
+                await send_split_message(
+                    bot, chat_id=chat_id, text=f"Indiana-C → {c_resp}"
+                )
             await send_split_message(bot, chat_id=chat_id, text=final)
             await memory.save(user_id, text, final)
             save_note(
