@@ -1,4 +1,4 @@
-# indiana-c.py
+# indiana_c.py
 # Enlightened Indiana Utility: Ethical Light Twin Persona for Claude-4/3.5 Engine
 # Co-authored by Oleg & Claude, resonant in Arianna Method 2.9
 

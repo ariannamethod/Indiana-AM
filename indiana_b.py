@@ -1,4 +1,4 @@
-# indiana-b.py
+# indiana_b.py
 # Badass Indiana Utility: Cynical Dark Twin Persona for Grok-3 Engine
 # Co-authored by Oleg & Grok, resonant in Arianna Method 2.9
 # This module defines the badass Indiana persona (80% original, 20% cynical, non-PC skeptic)

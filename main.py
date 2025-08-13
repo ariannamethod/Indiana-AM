@@ -39,6 +39,7 @@ from utils.voice import text_to_voice, voice_to_text
 from utils.context_neural_processor import parse_and_store_file
 from utils.rate_limiter import RateLimitMiddleware
 from utils.aml_terminal import terminal
+from utils.rawthinking import run_rawthinking
 from GENESIS_orchestrator import update_and_train, report_entropy
 
 # Настройка логгера
@@ -99,6 +100,7 @@ USER_LANGS = LRUCache(maxlen=LANG_CACHE_MAXLEN)
 VOICE_USERS: set[str] = set()
 DIVE_WAITING: set[str] = set()
 CODER_USERS: set[str] = set()
+RAW_THINKING_USERS: set[str] = set()
 
 GENESIS1_SILENT = True
 GENESIS1_SCHEDULE_FILE = Path("notes/genesis1_times.json")
@@ -731,6 +733,26 @@ async def command_imagine(m: types.Message):
     save_note({"time": datetime.now(timezone.utc).isoformat(), "user": user_id, "query": prompt, "response": caption})
 
 
+@dp.message(F.text == "/rawthinking")
+async def enable_rawthinking(m: types.Message):
+    """Enable raw thinking mode for the user."""
+    user_id = str(m.from_user.id)
+    RAW_THINKING_USERS.add(user_id)
+    lang = get_user_language(user_id, m.text or "", m.from_user.language_code)
+    await genesis6_report(user_id, m.text or "", lang)
+    await m.answer("☝🏻 raw thinking enabled")
+
+
+@dp.message(F.text == "/rawoff")
+async def disable_rawthinking(m: types.Message):
+    """Disable raw thinking mode for the user."""
+    user_id = str(m.from_user.id)
+    RAW_THINKING_USERS.discard(user_id)
+    lang = get_user_language(user_id, m.text or "", m.from_user.language_code)
+    await genesis6_report(user_id, m.text or "", lang)
+    await m.answer("☝🏻 raw thinking disabled")
+
+
 @dp.message(F.text == "/coder")
 async def enable_coder(m: types.Message):
     """Enable coder mode for the user."""
@@ -879,6 +901,32 @@ async def handle_message(m: types.Message):
         if user_id in DIVE_WAITING:
             DIVE_WAITING.discard(user_id)
             await run_deep_dive(chat_id, user_id, text, lang)
+            return
+
+        # Handle raw thinking mode
+        if user_id in RAW_THINKING_USERS and not text.startswith("/"):
+            responses = await run_rawthinking(text)
+            async with ChatActionSender(bot=bot, chat_id=chat_id, action="typing"):
+                await asyncio.sleep(3)
+            await send_split_message(bot, chat_id=chat_id, text=responses[0])
+            async with ChatActionSender(bot=bot, chat_id=chat_id, action="typing"):
+                await asyncio.sleep(5)
+            await send_split_message(bot, chat_id=chat_id, text=responses[1])
+            placeholder = await m.answer("Indiana sums it up...")
+            async with ChatActionSender(bot=bot, chat_id=chat_id, action="typing"):
+                await asyncio.sleep(2)
+            await bot.edit_message_text(
+                responses[2], chat_id=chat_id, message_id=placeholder.message_id
+            )
+            await memory.save(user_id, text, responses[2])
+            save_note(
+                {
+                    "time": datetime.now(timezone.utc).isoformat(),
+                    "user": user_id,
+                    "query": text,
+                    "response": responses[2],
+                }
+            )
             return
 
         # Handle coder mode
