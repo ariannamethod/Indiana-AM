@@ -9,7 +9,6 @@
 
 import os
 import httpx
-import json
 import asyncio
 
 # Enlightened Indiana Persona: 80% original, 20% ethical light-self
@@ -77,8 +76,14 @@ CLAUDE_HEADERS = {
     "content-type": "application/json"
 }
 
-async def light_indiana_chat(prompt: str) -> str:
-    """Async function to query Claude-4 with enlightened Indiana persona."""
+async def light_indiana_chat(prompt: str, lang: str = "en") -> str:
+    """Async function to query Claude-4 with enlightened Indiana persona.
+
+    Args:
+        prompt: User message to send to Claude.
+        lang: Preferred language for the reply (unused but kept for parity with
+            other agents).
+    """
     payload = {
         "model": "claude-3-5-sonnet-20241022",  # Using latest Claude model
         "max_tokens": 1000,
@@ -96,8 +101,14 @@ async def light_indiana_chat(prompt: str) -> str:
         return data["content"][0]["text"].strip()
 
 # Alternative function for different Claude API endpoints if needed
-async def light_indiana_chat_openrouter(prompt: str) -> str:
-    """Alternative async function using OpenRouter for Claude access."""
+async def light_indiana_chat_openrouter(prompt: str, lang: str = "en") -> str:
+    """Alternative async function using OpenRouter for Claude access.
+
+    Args:
+        prompt: User message to send to Claude via OpenRouter.
+        lang: Preferred language for the reply (unused but kept for parity with
+            other agents).
+    """
     openrouter_headers = {
         "Authorization": f"Bearer {os.getenv('OPENROUTER_API_KEY')}",
         "Content-Type": "application/json"
