@@ -936,11 +936,11 @@ async def handle_message(m: types.Message):
                 final, b_resp, c_resp = await run_rawthinking(text, lang)
             if b_resp:
                 await send_split_message(
-                    bot, chat_id=chat_id, text=f"Indiana-B → {b_resp}"
+                    bot, chat_id=chat_id, text=f"Indiana-B\n{b_resp}"
                 )
             if c_resp:
                 await send_split_message(
-                    bot, chat_id=chat_id, text=f"Indiana-C → {c_resp}"
+                    bot, chat_id=chat_id, text=f"Indiana-C\n{c_resp}"
                 )
             await send_split_message(bot, chat_id=chat_id, text=final)
             await memory.save(user_id, text, final)

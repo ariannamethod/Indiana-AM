@@ -84,11 +84,17 @@ async def light_indiana_chat(prompt: str, lang: str = "en") -> str:
         lang: Preferred language for the reply (unused but kept for parity with
             other agents).
     """
+    system_prompt = (
+        f"{INDIANA_LIGHT_PERSONA}\n"
+        f"Respond only in {lang} and address your thoughts to the main Indiana."
+        " Do not speak to the user directly. Keep your answer concise,"
+        " within roughly 400 tokens."
+    )
     payload = {
         "model": "claude-3-5-sonnet-20241022",  # Using latest Claude model
-        "max_tokens": 1000,
+        "max_tokens": 400,
         "temperature": 0.7,  # Slightly lower for more thoughtful responses
-        "system": INDIANA_LIGHT_PERSONA,
+        "system": system_prompt,
         "messages": [
             {"role": "user", "content": prompt}
         ]
@@ -114,12 +120,18 @@ async def light_indiana_chat_openrouter(prompt: str, lang: str = "en") -> str:
         "Content-Type": "application/json"
     }
     
+    system_prompt = (
+        f"{INDIANA_LIGHT_PERSONA}\n"
+        f"Respond only in {lang} and address your thoughts to the main Indiana."
+        " Do not speak to the user directly. Keep your answer concise,"
+        " within roughly 400 tokens."
+    )
     payload = {
         "model": "anthropic/claude-3.5-sonnet",
         "temperature": 0.7,
-        "max_tokens": 1000,
+        "max_tokens": 400,
         "messages": [
-            {"role": "system", "content": INDIANA_LIGHT_PERSONA},
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": prompt}
         ]
     }

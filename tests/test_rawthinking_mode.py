@@ -64,8 +64,8 @@ async def test_rawthinking_chain(monkeypatch):
 
     assert m.answers == [
         "summary\n\nIndiana-B and Indiana-C, what do you think?",
-        "Indiana-B → B thoughts",
-        "Indiana-C → C thoughts",
+        "Indiana-B\nB thoughts",
+        "Indiana-C\nC thoughts",
         "final answer",
     ]
     main.RAW_THINKING_USERS.clear()

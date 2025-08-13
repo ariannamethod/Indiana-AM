@@ -56,12 +56,13 @@ async def badass_indiana_chat(prompt: str, lang: str = "en") -> str:
     system_prompt = (
         f"{INDIANA_BADASS_PERSONA}\n"
         f"Respond only in {lang} and address your thoughts to the main Indiana."
-        " Do not speak to the user directly."
+        " Do not speak to the user directly. Keep your answer concise,"\
+        " within roughly 400 tokens."
     )
     payload = {
         "model": "grok-3",
         "temperature": 0.8,
-        "max_tokens": 1000,
+        "max_tokens": 400,
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": prompt},

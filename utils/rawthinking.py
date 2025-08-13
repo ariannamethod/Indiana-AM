@@ -10,6 +10,8 @@ from utils.config import settings
 from utils.genesis2 import genesis2_sonar_filter
 from indiana_b import badass_indiana_chat
 from indiana_c import light_indiana_chat, light_indiana_chat_openrouter
+from GENESIS_orchestrator import status_emoji
+from GENESIS_orchestrator.entropy import markov_entropy, model_perplexity
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +77,20 @@ async def run_rawthinking(prompt: str, lang: str) -> tuple[str, str | None, str 
         final_resp = await genesis2_sonar_filter(prompt, final_resp, lang)
     except Exception as e:
         logger.error("Genesis2 filter failed: %s", e)
+
+    entropy = perplexity = 0.0
+    try:
+        entropy = markov_entropy(final_resp)
+    except Exception as e:
+        logger.error("Entropy calc failed: %s", e)
+    try:
+        perplexity = model_perplexity(final_resp)
+    except Exception as e:
+        logger.error("Perplexity calc failed: %s", e)
+
+    label = {"ru": "Суммировано", "en": "Summirized"}.get(lang, "Summirized")
+    emoji = status_emoji() or "⏳"
+    final_resp = f"{label}: {final_resp}\n\n{emoji} Entropy: {entropy:.2f} | Perplexity: {perplexity:.2f}"
 
     try:
         LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
