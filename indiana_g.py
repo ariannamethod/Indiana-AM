@@ -57,7 +57,7 @@ You are not afraid to admit when you don't know something, seeing that lack of k
 
 """
 
-# Gemini API endpoint and headers (using Gemini API format)
+# Gemini API endpoint and headers
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent"
 GEMINI_API_KEY = os.getenv('GEMINI_GRAVITY_KEY')
 GEMINI_HEADERS = {
@@ -86,30 +86,52 @@ async def gravity_indiana_chat(prompt: str, lang: str = "en") -> str:
             }
         ],
         "generationConfig": {
-            "temperature": 0.9,  # Slightly higher for more creative, contemplative responses
+            "temperature": 0.9,
             "maxOutputTokens": 200
         }
     }
 
-    async with httpx.AsyncClient(timeout=60) as client:
-        resp = await client.post(GEMINI_API_URL, headers=GEMINI_HEADERS, json=payload)
-        resp.raise_for_status()
-        data = resp.json()
-        text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-        if data.get("prompt_feedback", {}).get("block_reason") is None and not text.endswith((".", "!", "?")):
-            for end in [".", "!", "?"]:
-                if end in text:
-                    text = text.rsplit(end, 1)[0] + end
-                    break
-        return text
+    try:
+        # Construct the URL with the API key as a query parameter
+        request_url = f"{GEMINI_API_URL}?key={GEMINI_API_KEY}"
+        async with httpx.AsyncClient(timeout=60) as client:
+            resp = await client.post(request_url, headers=GEMINI_HEADERS, json=payload)
+            resp.raise_for_status()
+            data = resp.json()
+            
+            # Check if there's any content to process
+            if "candidates" not in data or not data["candidates"]:
+                return "Indiana-G is silent..."
+            
+            text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+            
+            # Check for truncation and append ellipsis if necessary for narrative coherence
+            if data.get("prompt_feedback", {}).get("block_reason") is None and len(text) >= 200 * 3:
+                if not text.endswith((".", "!", "?")):
+                    text += "..."
+            
+            return text
+            
+    except httpx.HTTPStatusError as e:
+        print(f"Indiana-G failed with HTTP error: {e}")
+        # Return a more descriptive error message to the user
+        return f"Indiana-G encountered an API error: {Status Code {e.response.status_code}}. Please check your API key and permissions."
+    
+    except Exception as e:
+        print(f"Indiana-G failed with a general error: {e}")
+        return "Indiana-G is disoriented... try again later."
+
 
 # Quick test
 if __name__ == "__main__":
     async def _test():
+        # Example prompt for testing
+        test_prompt = "What is the nature of a question? How does a query create a field?"
         try:
-            answer = await gravity_indiana_chat("What is the nature of a question? How does a query create a field?")
+            print("Trying to query Indiana-G...")
+            answer = await gravity_indiana_chat(test_prompt)
             print("Indiana-G (Gravity-Twin):", answer)
         except Exception as e:
-            print(f"Gemini API failed: {e}")
+            print(f"Test failed with error: {e}")
 
     asyncio.run(_test())
