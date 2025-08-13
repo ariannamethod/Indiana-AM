@@ -22,7 +22,7 @@ from utils.config import settings
 from utils import dayandnight
 from utils import knowtheworld
 from utils.genesis1 import run_genesis1
-from utils.genesis2 import genesis2_sonar_filter
+from utils.genesis2 import genesis2_sonar_filter, assemble_final_reply
 from utils.genesis3 import genesis3_deep_dive
 from utils.genesis6 import genesis6_profile_filter
 from utils.deepdiving import perplexity_search
@@ -937,41 +937,42 @@ async def handle_message(m: types.Message):
                 "Indiana-B и Indiana-C, что скажете?" if lang == "ru" else "Indiana-B and Indiana-C, what do you think?"
             )
 
-            await m.answer("typing...")
-            await asyncio.sleep(random.uniform(5, 10))
+            async with ChatActionSender(bot=bot, chat_id=chat_id, action="typing"):
+                await asyncio.sleep(random.uniform(5, 10))
             await m.answer(f"{summary}\n\n{call_text}")
 
-            await m.answer("Indiana-B typing...")
-            await asyncio.sleep(random.uniform(2, 4))
-            b_resp = None
-            try:
-                b_resp = await b_task
-            except Exception as e:
-                logger.error("Indiana-B failed: %s", e)
+            async with ChatActionSender(bot=bot, chat_id=chat_id, action="typing"):
+                await asyncio.sleep(random.uniform(2, 4))
+                b_resp = None
+                try:
+                    b_resp = await b_task
+                except Exception as e:
+                    logger.error("Indiana-B failed: %s", e)
             if b_resp:
                 await send_split_message(
                     bot, chat_id=chat_id, text=f"Indiana-B\n{b_resp}"
                 )
 
-            await m.answer("Indiana-C typing...")
-            await asyncio.sleep(random.uniform(3, 6))
-            c_resp = None
-            try:
-                c_resp = await c_task
-            except Exception as e:
-                logger.error("Indiana-C failed: %s", e)
+            async with ChatActionSender(bot=bot, chat_id=chat_id, action="typing"):
+                await asyncio.sleep(random.uniform(3, 6))
+                c_resp = None
                 try:
-                    c_resp = await light_indiana_chat_openrouter(text, lang)
-                except Exception as e2:
-                    logger.error("Indiana-C fallback failed: %s", e2)
+                    c_resp = await c_task
+                except Exception as e:
+                    logger.error("Indiana-C failed: %s", e)
+                    try:
+                        c_resp = await light_indiana_chat_openrouter(text, lang)
+                    except Exception as e2:
+                        logger.error("Indiana-C fallback failed: %s", e2)
             if c_resp:
                 await send_split_message(
                     bot, chat_id=chat_id, text=f"Indiana-C\n{c_resp}"
                 )
 
-            await m.answer("typing...")
-            await asyncio.sleep(random.uniform(3, 8))
-            final = await synthesize_final(text, b_resp, c_resp, lang)
+            async with ChatActionSender(bot=bot, chat_id=chat_id, action="typing"):
+                await asyncio.sleep(random.uniform(3, 8))
+                final = await synthesize_final(text, b_resp, c_resp, lang)
+            final = await assemble_final_reply(text, final, lang)
             await send_split_message(bot, chat_id=chat_id, text=final)
 
             await memory.save(user_id, text, final)
