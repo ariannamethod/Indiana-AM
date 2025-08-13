@@ -136,7 +136,7 @@ La conception s’inspire de la théorie de l’information intégrée : genesis
 
 La planification suit un rythme de carte logistique, faible écho de la théorie du chaos où une petite variation de temps initial peut déplacer toute la cadence du monologue d’Indiana.
 
-Fonctionnellement, le module expose `run_genesis1(mode, digest_size)` et un orchestrateur de tâche quotidienne ; ensemble, ils génèrent des résumés, mettent en file des jobs de fond et journalisent les murmures récoltés.
+Fonctionnellement, le module expose `run_genesis1(digest_size)` et un orchestrateur de tâche quotidienne ; ensemble, ils génèrent des résumés, mettent en file des jobs de fond et journalisent les murmures récoltés.
 
 Philosophiquement, genesis1 agit comme un phénoménologue errant, réduisant les expériences brutes du jour à une essence suspendue entre noèse et noème.
 
