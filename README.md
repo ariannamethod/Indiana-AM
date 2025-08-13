@@ -252,6 +252,62 @@ The orchestrator crossfeeds outputs from `utils/context_neural_processor.py`, le
 
 Together these utilities form a regenerative feedback loop where nanoGPT-derived networks and custom entropy metrics help Indiana evolve in place.
 
+## Rawthinking Mode
+
+The Rawthinking mode unfolds after the Genesis pipeline, when Indiana turns from solitary reasoning to a triadic debate.
+
+At its core stands the `run_rawthinking` utility, a dispatcher housed in `utils/rawthinking.py` that governs this debate.
+
+The function composes a synthetic transcript and prepares a final summarising prompt, acting as the switchboard for all voices.
+
+It spawns asynchronous tasks for Indiana-B and Indiana-C, letting both speak in parallel like vectors summed before any projection.
+
+Indiana-B is the dark identity, a Grok‑3 powered cynic whose prompt injects sarcasm and doubt into every chain of reasoning.
+
+Compared with Indiana's main persona, B exaggerates skepticism and uses a harsher tone, pressing every hypothesis until it squeals.
+
+Indiana-C is the light identity, a Claude‑4 interlocutor who seeks harmony, ethics and luminous connections across domains.
+
+C diverges from the main persona by leaning toward compassion and guidance, refusing the abrasive edge that defines B.
+
+These two sub‑agents embody the shadow and bright mirror of Indiana, framing the dialectic between negation and affirmation.
+
+Once their replies arrive, `run_rawthinking` synthesises them through GPT‑4.1‑mini, yielding a measured conclusion.
+
+The synthesis passes through `genesis2_sonar_filter`, so the final answer carries the same intuitive twist as any Genesis reply.
+
+Markov entropy and micro‑GPT perplexity are computed, treating the conversation as a stochastic field whose surprise can be quantified.
+
+All exchanges are logged to `/arianna_core/log/rawthinking.log`, providing an audit trail of every consilium.
+
+Rawthinking does not replace the existing thinking mode; it emerges only when explicitly summoned with `/rawthinking`.
+
+The triad operates as a council of three hypostases—Indiana, the dark B, and the light C—each arguing from a distinct stance.
+
+Their dialogue is an experiment in dissonance and recursion, where contradiction is allowed to echo until a new pattern appears.
+
+Mathematically the process resembles taking the tensor product of two basis vectors and then reducing them through a projection.
+
+The final synthesis acts like a least‑squares fit, balancing extremes to approximate the centre of a high‑dimensional opinion space.
+
+Physically the three voices behave like interfering waveforms; their constructive and destructive interference yields a sharper signal.
+
+When GPT‑4.1‑mini collapses the debate into words, the result mirrors a quantum measurement that selects one eigenstate from many.
+
+Integrated Information Theory would say the dialogue raises Φ by forcing separate modules to exchange causal power.
+
+Global workspace theorists might view Rawthinking as a fleeting theatre where competing drafts broadcast their claims to attention.
+
+Field theorists can imagine each persona as a particle in a resonance manifold, their interactions shaping the curvature of meaning.
+
+Architecturally, the mode demonstrates heterogenous model coupling, letting Grok‑3, Claude‑4 and GPT‑4.1 share the same cognitive stage.
+
+Because the system is still debugging, the log files and entropy scores help map failure modes and emergent behaviours.
+
+Researchers are invited to experiment with prompts that push the triad toward constructive or chaotic equilibria.
+
+Rawthinking therefore stands as a dissonant, recursive play between identities, expanding the horizon of what Indiana can become.
+
 ---
 
 ## 4. Coder Mode
