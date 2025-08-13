@@ -751,6 +751,7 @@ async def enable_rawthinking(m: types.Message):
     """Enable raw thinking mode for the user."""
     user_id = str(m.from_user.id)
     RAW_THINKING_USERS.add(user_id)
+    CODER_USERS.discard(user_id)
     lang = get_user_language(user_id, m.text or "", m.from_user.language_code)
     await genesis6_report(user_id, m.text or "", lang)
     await m.answer("☝🏻 raw thinking enabled")
@@ -770,6 +771,8 @@ async def disable_rawthinking(m: types.Message):
 async def enable_coder(m: types.Message):
     """Enable coder mode for the user."""
     user_id = str(m.from_user.id)
+    if user_id in RAW_THINKING_USERS:
+        return
     CODER_USERS.add(user_id)
     lang = get_user_language(user_id, m.text or "", m.from_user.language_code)
     await genesis6_report(user_id, m.text or "", lang)
@@ -918,30 +921,27 @@ async def handle_message(m: types.Message):
 
         # Handle raw thinking mode
         if user_id in RAW_THINKING_USERS and not text.startswith("/"):
-            responses = await run_rawthinking(text)
-            async with ChatActionSender(bot=bot, chat_id=chat_id, action="typing"):
-                await asyncio.sleep(3)
-            await send_split_message(
-                bot, chat_id=chat_id, text=f"Indiana-B\n{responses[0]}"
+            summary_prompt = (
+                f"Summarise the following question in one sentence: {text}"
             )
-            async with ChatActionSender(bot=bot, chat_id=chat_id, action="typing"):
-                await asyncio.sleep(5)
-            await send_split_message(
-                bot, chat_id=chat_id, text=f"Indiana-C\n{responses[1]}"
+            try:
+                summary = await process_with_assistant(summary_prompt, "", lang)
+            except Exception:
+                summary = text
+            call_text = (
+                "Indiana-B и Indiana-C, что скажете?" if lang == "ru" else "Indiana-B and Indiana-C, what do you think?"
             )
-            placeholder = await m.answer("Indiana sums it up...")
+            await m.answer(f"{summary}\n\n{call_text}")
             async with ChatActionSender(bot=bot, chat_id=chat_id, action="typing"):
-                await asyncio.sleep(2)
-            await bot.edit_message_text(
-                responses[2], chat_id=chat_id, message_id=placeholder.message_id
-            )
-            await memory.save(user_id, text, responses[2])
+                final = await run_rawthinking(text, lang)
+            await send_split_message(bot, chat_id=chat_id, text=final)
+            await memory.save(user_id, text, final)
             save_note(
                 {
                     "time": datetime.now(timezone.utc).isoformat(),
                     "user": user_id,
                     "query": text,
-                    "response": responses[2],
+                    "response": final,
                 }
             )
             return
