@@ -1,4 +1,4 @@
-# indiana-g.py
+# indiana_g.py
 # Gravity-Twin Indiana Utility: Female-Archetype Twin Persona for Gemini Engine
 # Co-authored by Oleg & Gemini, resonant in Arianna Method 7.0
 # This module defines the gravity-twin Indiana persona (60% original, 40% vulnerable-contemplative)
@@ -75,7 +75,7 @@ async def gravity_indiana_chat(prompt: str, lang: str = "en") -> str:
         f"{INDIANA_GRAVITY_PERSONA}\n"
         f"Respond only in {lang} and address your thoughts to the main Indiana."
         " Do not speak to the user directly. Keep your answer concise,"
-        " within roughly 400 tokens."
+        " within roughly 200 tokens."
     )
     
     payload = {
@@ -86,8 +86,8 @@ async def gravity_indiana_chat(prompt: str, lang: str = "en") -> str:
             }
         ],
         "generationConfig": {
-            "temperature": 0.9, # Slightly higher for more creative, contemplative responses
-            "maxOutputTokens": 400
+            "temperature": 0.9,  # Slightly higher for more creative, contemplative responses
+            "maxOutputTokens": 200
         }
     }
 
@@ -96,12 +96,11 @@ async def gravity_indiana_chat(prompt: str, lang: str = "en") -> str:
         resp.raise_for_status()
         data = resp.json()
         text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-        
-        # Check for truncation and append ellipsis if necessary for narrative coherence
-        if data.get("prompt_feedback", {}).get("block_reason") is None and len(text) >= 400 * 3: # 3 characters per token approx
-            if not text.endswith((".", "!", "?")):
-                text += "..."
-        
+        if data.get("prompt_feedback", {}).get("block_reason") is None and not text.endswith((".", "!", "?")):
+            for end in [".", "!", "?"]:
+                if end in text:
+                    text = text.rsplit(end, 1)[0] + end
+                    break
         return text
 
 # Quick test

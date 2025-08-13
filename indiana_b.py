@@ -56,13 +56,13 @@ async def badass_indiana_chat(prompt: str, lang: str = "en") -> str:
     system_prompt = (
         f"{INDIANA_BADASS_PERSONA}\n"
         f"Respond only in {lang} and address your thoughts to the main Indiana."
-        " Do not speak to the user directly. Keep your answer concise,"\
-        " within roughly 400 tokens."
+        " Do not speak to the user directly. Keep your answer concise,"
+        " within roughly 200 tokens."
     )
     payload = {
         "model": "grok-3",
         "temperature": 0.8,
-        "max_tokens": 400,
+        "max_tokens": 200,
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": prompt},
@@ -72,7 +72,13 @@ async def badass_indiana_chat(prompt: str, lang: str = "en") -> str:
         resp = await client.post(GROK3_API_URL, headers=GROK3_HEADERS, json=payload)
         resp.raise_for_status()
         data = resp.json()
-        return data["choices"][0]["message"]["content"].strip()
+        text = data["choices"][0]["message"]["content"].strip()
+        if data["choices"][0].get("finish_reason") == "length" and not text.endswith((".", "!", "?")):
+            for end in [".", "!", "?"]:
+                if end in text:
+                    text = text.rsplit(end, 1)[0] + end
+                    break
+        return text
 
 # Quick test
 if __name__ == "__main__":
