@@ -351,14 +351,15 @@ async def run_deep_dive(chat_id: int, user_id: str, query: str, lang: str) -> No
 async def setup_bot_commands() -> None:
     """Configure bot commands for menu button."""
     commands = [
-        types.BotCommand(command="rawthinking", description="make it raw --"),
-        types.BotCommand(command="rawoff", description="no raw"),
-        types.BotCommand(command="deep", description="deep mode"),
-        types.BotCommand(command="deepoff", description="deep off"),
         types.BotCommand(command="voiceon", description="voice mode"),
         types.BotCommand(command="voiceoff", description="mute"),
-        types.BotCommand(command="dive", description="deep diving"),
         types.BotCommand(command="imagine", description="imagine"),
+        types.BotCommand(command="vision", description="See"),
+        types.BotCommand(command="rawthinking", description="#RAW#"),
+        types.BotCommand(command="rawoff", description="#NORAW#"),
+        types.BotCommand(command="deep", description="deep mode"),
+        types.BotCommand(command="deepoff", description="deep off"),
+        types.BotCommand(command="dive", description="deep diving"),
         types.BotCommand(command="coder", description="show me your code"),
         types.BotCommand(command="coderoff", description="code off"),
         types.BotCommand(command="silent", description="GENESIS silent mode"),
@@ -750,6 +751,34 @@ async def command_imagine(m: types.Message):
     save_note({"time": datetime.now(timezone.utc).isoformat(), "user": user_id, "query": prompt, "response": caption})
 
 
+@dp.message(F.text.startswith("/vision"))
+async def command_vision(m: types.Message):
+    """Analyze an image via URL."""
+    user_id = str(m.from_user.id)
+    url = m.text[7:].strip() if m.text else ""
+    lang = get_user_language(user_id, url, m.from_user.language_code)
+    if not url:
+        await m.answer("☝🏻 ❓")
+        return
+    profile = await genesis6_report(user_id, url or "", lang)
+    async with ChatActionSender(bot=bot, chat_id=m.chat.id, action="typing"):
+        description = await asyncio.to_thread(analyze_image, url)
+        if profile:
+            description = await process_with_assistant(description, "", lang, profile)
+        twist = await genesis2_sonar_filter(url, description, lang)
+    reply = f"{description}\n\n🜂 Investigative Twist → {twist}"
+    await memory.save(user_id, f"vision: {url}", reply)
+    save_note({"time": datetime.now(timezone.utc).isoformat(), "user": user_id, "query": url, "response": reply})
+    if user_id in VOICE_USERS and client:
+        try:
+            audio_bytes = await text_to_voice(client, reply)
+            voice_file = types.BufferedInputFile(audio_bytes, filename="reply.ogg")
+            await bot.send_voice(m.chat.id, voice_file)
+        except Exception as e:
+            logger.error(f"Voice synthesis failed: {e}")
+    await send_split_message(bot, chat_id=m.chat.id, text=reply)
+
+
 @dp.message(F.text == "/rawthinking")
 async def enable_rawthinking(m: types.Message):
     """Enable raw thinking mode for the user."""
@@ -757,8 +786,8 @@ async def enable_rawthinking(m: types.Message):
     RAW_THINKING_USERS.add(user_id)
     CODER_USERS.discard(user_id)
     lang = get_user_language(user_id, m.text or "", m.from_user.language_code)
-    await genesis6_report(user_id, m.text or "", lang)
-    await m.answer("☝🏻 raw thinking enabled")
+    await m.answer("☝🏻 RAW ON")
+    asyncio.create_task(genesis6_report(user_id, m.text or "", lang))
 
 
 @dp.message(F.text == "/rawoff")
@@ -767,8 +796,8 @@ async def disable_rawthinking(m: types.Message):
     user_id = str(m.from_user.id)
     RAW_THINKING_USERS.discard(user_id)
     lang = get_user_language(user_id, m.text or "", m.from_user.language_code)
-    await genesis6_report(user_id, m.text or "", lang)
-    await m.answer("☝🏻 raw thinking disabled")
+    await m.answer("☝🏻 NO RAW")
+    asyncio.create_task(genesis6_report(user_id, m.text or "", lang))
 
 
 @dp.message(F.text == "/coder")
