@@ -65,3 +65,14 @@ async def test_coder_help_returns_core_commands(monkeypatch):
 
     assert m.answers == ["core help\n\n🜂 Investigative Twist → twist"]
     main.CODER_USERS.clear()
+
+
+@pytest.mark.asyncio
+async def test_coder_ignored_during_rawthinking():
+    main.CODER_USERS.clear()
+    main.RAW_THINKING_USERS.add("123")
+    m = DummyMessage("/coder")
+    await main.enable_coder(m)
+    assert m.answers == []
+    assert "123" not in main.CODER_USERS
+    main.RAW_THINKING_USERS.clear()

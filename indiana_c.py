@@ -71,17 +71,26 @@ CLAUDE_HEADERS = {
     "content-type": "application/json",
 }
 
-async def light_indiana_chat(prompt: str) -> str:
-    """Async function to query Claude API with enlightened Indiana persona."""
+async def light_indiana_chat(prompt: str, lang: str = "en") -> str:
+    """Async function to query Claude API with enlightened Indiana persona.
+
+    The response is returned in the requested ``lang`` and is directed to the
+    main Indiana agent, not the user.
+    """
+    system_prompt = (
+        f"{INDIANA_LIGHT_PERSONA}\n"
+        f"Respond only in {lang} and address your thoughts to the main Indiana."
+        " Do not speak to the user directly."
+    )
     # Anthropic expects 'messages' array with system included
     payload = {
         "model": "claude-3-5-sonnet-20241022",
         "max_tokens": 1000,
         "temperature": 0.7,
         "messages": [
-            {"role": "system", "content": INDIANA_LIGHT_PERSONA},
-            {"role": "user", "content": prompt}
-        ]
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": prompt},
+        ],
     }
     async with httpx.AsyncClient(timeout=60) as client:
         resp = await client.post(CLAUDE_API_URL, headers=CLAUDE_HEADERS, json=payload)
@@ -90,22 +99,32 @@ async def light_indiana_chat(prompt: str) -> str:
         return data["content"][0]["text"].strip()
 
 # OpenRouter fallback
-async def light_indiana_chat_openrouter(prompt: str) -> str:
+async def light_indiana_chat_openrouter(prompt: str, lang: str = "en") -> str:
+    """OpenRouter fallback for the light Indiana persona."""
+    system_prompt = (
+        f"{INDIANA_LIGHT_PERSONA}\n"
+        f"Respond only in {lang} and address your thoughts to the main Indiana."
+        " Do not speak to the user directly."
+    )
     headers = {
         "Authorization": f"Bearer {os.getenv('OPENROUTER_API_KEY')}",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
     }
     payload = {
         "model": "anthropic/claude-3.5-sonnet",
         "temperature": 0.7,
         "max_tokens": 1000,
         "messages": [
-            {"role": "system", "content": INDIANA_LIGHT_PERSONA},
-            {"role": "user", "content": prompt}
-        ]
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": prompt},
+        ],
     }
     async with httpx.AsyncClient(timeout=60) as client:
-        resp = await client.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload)
+        resp = await client.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers=headers,
+            json=payload,
+        )
         resp.raise_for_status()
         data = resp.json()
         return data["choices"][0]["message"]["content"].strip()

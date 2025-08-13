@@ -9,7 +9,6 @@
 
 import os
 import httpx
-import json
 import asyncio
 
 # Badass Indiana Persona: 80% original, 20% cynical shadow-self
@@ -48,16 +47,25 @@ GROK3_HEADERS = {
     "Content-Type": "application/json"
 }
 
-async def badass_indiana_chat(prompt: str) -> str:
-    """Async function to query Grok-3 with badass Indiana persona."""
+async def badass_indiana_chat(prompt: str, lang: str = "en") -> str:
+    """Async function to query Grok-3 with badass Indiana persona.
+
+    The response is always returned in the language specified by ``lang`` and is
+    addressed to the main Indiana agent rather than directly to the user.
+    """
+    system_prompt = (
+        f"{INDIANA_BADASS_PERSONA}\n"
+        f"Respond only in {lang} and address your thoughts to the main Indiana."
+        " Do not speak to the user directly."
+    )
     payload = {
         "model": "grok-3",
         "temperature": 0.8,
         "max_tokens": 1000,
         "messages": [
-            {"role": "system", "content": INDIANA_BADASS_PERSONA},
-            {"role": "user", "content": prompt}
-        ]
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": prompt},
+        ],
     }
     async with httpx.AsyncClient(timeout=60) as client:
         resp = await client.post(GROK3_API_URL, headers=GROK3_HEADERS, json=payload)
