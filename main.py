@@ -347,6 +347,8 @@ async def run_deep_dive(chat_id: int, user_id: str, query: str, lang: str) -> No
 async def setup_bot_commands() -> None:
     """Configure bot commands for menu button."""
     commands = [
+        types.BotCommand(command="rawthinking", description="make it raw --"),
+        types.BotCommand(command="rawoff", description="no raw"),
         types.BotCommand(command="deep", description="deep mode"),
         types.BotCommand(command="deepoff", description="deep off"),
         types.BotCommand(command="voiceon", description="voice mode"),
@@ -656,10 +658,21 @@ async def toggle_emergency_mode(m: types.Message):
 async def enable_deep_mode(m: types.Message):
     """Enable persistent Genesis-3 deep dives."""
     global FORCE_DEEP_DIVE
-    FORCE_DEEP_DIVE = True
     user_id = str(m.from_user.id)
     lang = get_user_language(user_id, m.text or "", m.from_user.language_code)
     await genesis6_report(user_id, m.text or "", lang)
+    if user_id in RAW_THINKING_USERS:
+        templates = [
+            "DEEP is incompatible with RAW; choose one path.",
+            "RAW mode blocks DEEP—spirit and concept clash.",
+            "You can't blend RAW with DEEP. Pick a side.",
+            "RAW and DEEP don't mix; it's either this or that.",
+        ]
+        base = random.choice(templates)
+        reply = await genesis2_sonar_filter(m.text or "", base, lang)
+        await m.answer(reply)
+        return
+    FORCE_DEEP_DIVE = True
     await m.answer("☝🏻 deep mode enabled")
 
 
@@ -908,10 +921,14 @@ async def handle_message(m: types.Message):
             responses = await run_rawthinking(text)
             async with ChatActionSender(bot=bot, chat_id=chat_id, action="typing"):
                 await asyncio.sleep(3)
-            await send_split_message(bot, chat_id=chat_id, text=responses[0])
+            await send_split_message(
+                bot, chat_id=chat_id, text=f"Indiana-B\n{responses[0]}"
+            )
             async with ChatActionSender(bot=bot, chat_id=chat_id, action="typing"):
                 await asyncio.sleep(5)
-            await send_split_message(bot, chat_id=chat_id, text=responses[1])
+            await send_split_message(
+                bot, chat_id=chat_id, text=f"Indiana-C\n{responses[1]}"
+            )
             placeholder = await m.answer("Indiana sums it up...")
             async with ChatActionSender(bot=bot, chat_id=chat_id, action="typing"):
                 await asyncio.sleep(2)
