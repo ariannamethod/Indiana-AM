@@ -7,10 +7,9 @@ from pathlib import Path
 from openai import AsyncOpenAI
 
 from utils.config import settings
-from utils.genesis2 import genesis2_sonar_filter
+from utils.genesis2 import assemble_final_reply
 from indiana_b import badass_indiana_chat
 from indiana_c import light_indiana_chat, light_indiana_chat_openrouter
-from GENESIS_orchestrator import status_emoji
 from GENESIS_orchestrator.entropy import markov_entropy, model_perplexity
 
 logger = logging.getLogger(__name__)
@@ -24,7 +23,7 @@ async def run_rawthinking(prompt: str, lang: str) -> tuple[str, str | None, str 
     """Run Indiana-B, Indiana-C, and synthesise a final answer.
 
     Returns a tuple ``(final, b_resp, c_resp)`` where ``final`` is the main
-    Indiana's reply (already passed through ``genesis2_sonar_filter``) and the
+    Indiana's reply (already passed through ``assemble_final_reply``) and the
     other elements contain raw responses from Indiana-B and Indiana-C. Even if
     one of the sub-agents fails, a final answer is produced from the available
     responses without exposing errors to the caller.
@@ -53,7 +52,10 @@ async def run_rawthinking(prompt: str, lang: str) -> tuple[str, str | None, str 
         final_prompt += f"Indiana-B replied: {b_resp}\n"
     if c_resp:
         final_prompt += f"Indiana-C replied: {c_resp}\n"
-    final_prompt += "Provide a concise, thoughtful synthesis addressing the user's request."
+    final_prompt += (
+        "Summarize Indiana-B's and Indiana-C's replies separately. "
+        "Afterward, provide your own final conclusion for the user."
+    )
 
     final_resp = "— no connection —"
     if client:
@@ -73,32 +75,37 @@ async def run_rawthinking(prompt: str, lang: str) -> tuple[str, str | None, str 
         except Exception as e:
             logger.error("Final synthesis failed: %s", e)
 
+    final_reply = final_resp
     try:
-        final_resp = await genesis2_sonar_filter(prompt, final_resp, lang)
+        final_reply = await assemble_final_reply(prompt, final_resp, lang)
     except Exception as e:
-        logger.error("Genesis2 filter failed: %s", e)
+        logger.error("Genesis2 assembly failed: %s", e)
 
     entropy = perplexity = 0.0
     try:
-        entropy = markov_entropy(final_resp)
+        entropy = markov_entropy(final_reply)
     except Exception as e:
         logger.error("Entropy calc failed: %s", e)
     try:
-        perplexity = model_perplexity(final_resp)
+        perplexity = model_perplexity(final_reply)
     except Exception as e:
         logger.error("Perplexity calc failed: %s", e)
-
-    label = {"ru": "Суммировано", "en": "Summirized"}.get(lang, "Summirized")
-    emoji = status_emoji() or "⏳"
-    final_resp = f"{label}: {final_resp}\n\n{emoji} Entropy: {entropy:.2f} | Perplexity: {perplexity:.2f}"
 
     try:
         LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
         with LOG_FILE.open("a", encoding="utf-8") as f:
             f.write(
-                f"Q: {prompt}\nB: {b_resp or '—'}\nC: {c_resp or '—'}\nFinal: {final_resp}\n---\n",
+                "Q: {q}\nB: {b}\nC: {c}\nFinal: {f}\n"
+                "Entropy: {e:.2f} | Perplexity: {p:.2f}\n---\n".format(
+                    q=prompt,
+                    b=b_resp or "—",
+                    c=c_resp or "—",
+                    f=final_reply,
+                    e=entropy,
+                    p=perplexity,
+                )
             )
     except Exception as e:
         logger.error("Failed to log rawthinking: %s", e)
 
-    return final_resp, b_resp, c_resp
+    return final_reply, b_resp, c_resp
