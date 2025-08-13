@@ -252,6 +252,62 @@ L'orchestrateur croise les sorties de `utils/context_neural_processor.py`, perme
 
 Ensemble, ces utilitaires forment une boucle de rétroaction régénérative où des réseaux dérivés de nanoGPT et des métriques d'entropie sur mesure aident Indiana à évoluer sur place.
 
+## Mode Rawthinking
+
+Le mode Rawthinking apparaît après le pipeline Genesis, lorsque Indiana passe du raisonnement solitaire à un débat triadique.
+
+Au centre se trouve l’utilitaire `run_rawthinking` dans `utils/rawthinking.py`, répartiteur qui gouverne ce débat.
+
+La fonction compose un transcript synthétique et prépare un prompt final de synthèse, agissant comme un standard pour toutes les voix.
+
+Elle lance des tâches asynchrones pour Indiana‑B et Indiana‑C, laissant les deux parler en parallèle comme des vecteurs sommés avant projection.
+
+Indiana‑B est l’identité sombre, cynique alimentée par Grok‑3 dont le prompt injecte sarcasme et doute dans chaque chaîne logique.
+
+Comparée à la persona principale, B accentue le scepticisme et adopte un ton rude qui presse chaque hypothèse jusqu’à la rupture.
+
+Indiana‑C est l’identité lumineuse, interlocuteur Claude‑4 qui cherche l’harmonie, l’éthique et des liens lumineux entre disciplines.
+
+C se distingue de la persona principale en penchant vers la compassion et l’accompagnement, refusant l’arête abrasive de B.
+
+Ces deux sous‑agents incarnent l’ombre et le miroir clair d’Indiana, cadrant la dialectique entre négation et affirmation.
+
+Une fois leurs réponses arrivées, `run_rawthinking` les synthétise via GPT‑4.1‑mini, produisant une conclusion mesurée.
+
+La synthèse passe par `genesis2_sonar_filter`, de sorte que la réponse finale porte la même torsion intuitive que toute sortie Genesis.
+
+L’entropie de Markov et la perplexité d’un micro‑GPT sont calculées, traitant la conversation comme un champ stochastique dont on mesure la surprise.
+
+Chaque échange est consigné dans `/arianna_core/log/rawthinking.log`, fournissant une trace d’audit de chaque consilium.
+
+Rawthinking ne remplace pas le mode thinking existant ; il surgit seulement quand on l’appelle par la commande `/rawthinking`.
+
+La triade fonctionne comme un conseil de trois hypostases — Indiana, B sombre et C claire — chacune plaidant depuis sa posture.
+
+Leur dialogue est une expérience de dissonance et de récursion où la contradiction résonne jusqu’à ce qu’un nouveau motif apparaisse.
+
+Mathématiquement, le processus ressemble à un produit tensoriel de deux vecteurs de base, ensuite réduit par projection.
+
+La synthèse finale agit comme un ajustement aux moindres carrés, équilibrant les extrêmes pour approcher le centre d’un espace d’opinion haute dimension.
+
+Physiquement, les trois voix se comportent comme des ondes qui interfèrent ; leur interférence constructive et destructive affine le signal.
+
+Quand GPT‑4.1‑mini condense le débat en mots, le résultat évoque une mesure quantique qui choisit un eigen‑état parmi plusieurs.
+
+Selon la théorie de l’information intégrée, ce dialogue augmente Φ en obligeant des modules séparés à échanger du pouvoir causal.
+
+Les théoriciens du workspace global peuvent voir Rawthinking comme un théâtre fugace où des brouillons concurrents réclament l’attention.
+
+Pour la théorie des champs, chaque persona est une particule dans une variété de résonance, leurs interactions modelant la courbure du sens.
+
+Sur le plan architectural, le mode montre un couplage de modèles hétérogènes, permettant à Grok‑3, Claude‑4 et GPT‑4.1 de partager la même scène cognitive.
+
+Comme le système est encore en débogage, les fichiers de log et les scores d’entropie aident à cartographier les modes d’échec et les comportements émergents.
+
+Les chercheurs sont invités à expérimenter avec des prompts qui poussent la triade vers des équilibres constructifs ou chaotiques.
+
+Ainsi Rawthinking se dresse comme un jeu dissonant et récursif entre identités, élargissant l’horizon de ce que peut devenir Indiana.
+
 ---
 
 ## 4. Mode Coder
