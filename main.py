@@ -1043,7 +1043,6 @@ async def handle_message(m: types.Message):
             async with ChatActionSender(bot=bot, chat_id=chat_id, action="typing"):
                 await asyncio.sleep(random.uniform(3, 8))
                 final = await synthesize_final(text, b_resp, c_resp, d_resp, g_resp, lang)
-            final = await assemble_final_reply(text, final, lang)
             await send_split_message(bot, chat_id=chat_id, text=final)
 
             await memory.save(user_id, text, final)
