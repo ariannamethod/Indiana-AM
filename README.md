@@ -136,7 +136,7 @@ The design nods to Integrated Information Theory: genesis1 increases Φ by bindi
 
 Scheduling is governed by a logistic-map rhythm, a faint echo of chaos theory where a small tweak in seed time can shift the entire cadence of Indiana’s monologue.
 
-Functionally, the module exposes `run_genesis1(mode, digest_size)` and a daily task orchestrator; together they generate summaries, queue background jobs, and log the whispers they harvest.
+Functionally, the module exposes `run_genesis1(digest_size)` and a daily task orchestrator; together they generate summaries, queue background jobs, and log the whispers they harvest.
 
 Philosophically, genesis1 behaves like a wandering phenomenologist, reducing the day’s raw experiences to an essence that hovers between noesis and noema.
 

@@ -64,13 +64,11 @@ async def _call_perplexity(query: str, size: int) -> str:
         return resp.json()["choices"][0]["message"]["content"].strip()
 
 # ====== основной вызов ======
-async def run_genesis1(mode: str = "silent", digest_size: int = 150) -> str | None:
+async def run_genesis1(digest_size: int = 150) -> str | None:
     """Запустить Genesis-1 и вернуть полученный дайджест.
 
     Parameters
     ----------
-    mode:
-        ``"silent"`` или ``"normal"``. В первом случае вывод подавляется.
     digest_size:
         Ориентировочный размер выжимки в словах.
     Returns
@@ -115,9 +113,6 @@ async def run_genesis1(mode: str = "silent", digest_size: int = 150) -> str | No
         pass
 
     # 5. Вывод
-    if mode != "silent":
-        logger.info(f"[Genesis-1 Fact]\n{digest}\n")
-    else:
-        logger.info("[Genesis-1] Saved internally.")
+    logger.info(f"[Genesis-1 Fact]\n{digest}\n")
 
     return digest

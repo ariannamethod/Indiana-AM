@@ -106,7 +106,6 @@ DIVE_WAITING: set[str] = set()
 CODER_USERS: set[str] = set()
 RAW_THINKING_USERS: set[str] = set()
 
-GENESIS1_SILENT = True
 GENESIS1_SCHEDULE_FILE = Path("notes/genesis1_times.json")
 
 MESSAGE_CACHE_MAXLEN = 1000
@@ -298,17 +297,15 @@ async def genesis1_daily_task():
         if run_time <= now:
             run_time += timedelta(days=1)
         await asyncio.sleep((run_time - now).total_seconds())
-        mode = "silent" if GENESIS1_SILENT else "normal"
-        digest = await run_genesis1(mode=mode)
+        digest = await run_genesis1()
         if digest:
             save_note({"time": datetime.now(timezone.utc).isoformat(), "genesis1": digest})
-            if not GENESIS1_SILENT:
-                try:
-                    twist = await genesis2_sonar_filter(digest, digest, "en")
-                    msg = f"☝🏻 {digest}\n\n🜂 Investigative Twist → {twist}"
-                    await send_split_message(bot, chat_id=AGENT_GROUP, text=msg)
-                except Exception as e:
-                    logger.error(f"Genesis1 send failed: {e}")
+            try:
+                twist = await genesis2_sonar_filter(digest, digest, "en")
+                msg = f"☝🏻 {digest}\n\n🜂 Investigative Twist → {twist}"
+                await send_split_message(bot, chat_id=AGENT_GROUP, text=msg)
+            except Exception as e:
+                logger.error(f"Genesis1 send failed: {e}")
 
 
 async def run_deep_dive(chat_id: int, user_id: str, query: str, lang: str) -> None:
@@ -362,8 +359,6 @@ async def setup_bot_commands() -> None:
         types.BotCommand(command="dive", description="deep diving"),
         types.BotCommand(command="coder", description="show me your code"),
         types.BotCommand(command="coderoff", description="code off"),
-        types.BotCommand(command="silent", description="GENESIS silent mode"),
-        types.BotCommand(command="nosilent", description="GENESIS true mode"),
     ]
     try:
         await bot.set_my_commands(commands)
@@ -820,28 +815,6 @@ async def disable_coder(m: types.Message):
     lang = get_user_language(user_id, m.text or "", m.from_user.language_code)
     await genesis6_report(user_id, m.text or "", lang)
     await m.answer("☝🏻 coder mode disabled")
-
-
-@dp.message(F.text == "/silent")
-async def enable_genesis_silent(m: types.Message):
-    """Enable Genesis silent mode."""
-    global GENESIS1_SILENT
-    GENESIS1_SILENT = True
-    user_id = str(m.from_user.id)
-    lang = get_user_language(user_id, m.text or "", m.from_user.language_code)
-    await genesis6_report(user_id, m.text or "", lang)
-    await m.answer("☝🏻 genesis silent mode")
-
-
-@dp.message(F.text == "/nosilent")
-async def disable_genesis_silent(m: types.Message):
-    """Disable Genesis silent mode."""
-    global GENESIS1_SILENT
-    GENESIS1_SILENT = False
-    user_id = str(m.from_user.id)
-    lang = get_user_language(user_id, m.text or "", m.from_user.language_code)
-    await genesis6_report(user_id, m.text or "", lang)
-    await m.answer("☝🏻 genesis true mode")
 
 # --- Document Handler ---
 @dp.message(F.document)
