@@ -63,6 +63,7 @@ GEMINI_API_KEY = os.getenv('GEMINI_GRAVITY_KEY')
 GEMINI_HEADERS = {
     "Content-Type": "application/json"
 }
+MAX_OUTPUT_TOKENS = 220
 
 async def gravity_indiana_chat(prompt: str, lang: str = "en") -> str:
     """Async function to query Gemini with gravity-twin Indiana persona.
@@ -75,7 +76,7 @@ async def gravity_indiana_chat(prompt: str, lang: str = "en") -> str:
         f"{INDIANA_GRAVITY_PERSONA}\n"
         f"Respond only in {lang} and address your thoughts to the main Indiana."
         " Do not speak to the user directly. Keep your answer concise,"
-        " within roughly 200 tokens."
+        f" within roughly {MAX_OUTPUT_TOKENS} tokens."
     )
     
     payload = {
@@ -87,7 +88,7 @@ async def gravity_indiana_chat(prompt: str, lang: str = "en") -> str:
         ],
         "generationConfig": {
             "temperature": 0.9,
-            "maxOutputTokens": 200
+            "maxOutputTokens": MAX_OUTPUT_TOKENS
         }
     }
 
@@ -104,12 +105,15 @@ async def gravity_indiana_chat(prompt: str, lang: str = "en") -> str:
                 return "Indiana-G is silent..."
             
             text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-            
-            # Check for truncation and append ellipsis if necessary for narrative coherence
-            if data.get("prompt_feedback", {}).get("block_reason") is None and len(text) >= 200 * 3:
-                if not text.endswith((".", "!", "?")):
+
+            # Ensure the response ends with proper punctuation, adding an ellipsis when truncated
+            block_reason = data.get("prompt_feedback", {}).get("block_reason")
+            if not text.endswith((".", "!", "?")):
+                if block_reason is None and len(text) >= MAX_OUTPUT_TOKENS * 3:
                     text += "..."
-            
+                else:
+                    text += "."
+
             return text
             
     except httpx.HTTPStatusError as e:
