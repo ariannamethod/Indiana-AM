@@ -19,33 +19,16 @@ client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY) if settings.OPENAI_API_KEY
 LOG_FILE = Path("/arianna_core/log/rawthinking.log")
 
 
-async def run_rawthinking(prompt: str, lang: str) -> tuple[str, str | None, str | None]:
-    """Run Indiana-B, Indiana-C, and synthesise a final answer.
+async def synthesize_final(
+    prompt: str, b_resp: str | None, c_resp: str | None, lang: str
+) -> str:
+    """Synthesize the final Indiana answer in the given ``lang``.
 
-    Returns a tuple ``(final, b_resp, c_resp)`` where ``final`` is the main
-    Indiana's reply (already passed through ``assemble_final_reply``) and the
-    other elements contain raw responses from Indiana-B and Indiana-C. Even if
-    one of the sub-agents fails, a final answer is produced from the available
-    responses without exposing errors to the caller.
+    The function summarises Indiana-B's and Indiana-C's replies separately in a
+    concise manner (roughly half the length of the originals) and produces
+    Indiana's concluding message. The reply is guaranteed to remain in the
+    conversation language specified by ``lang``.
     """
-    b_resp = c_resp = None
-
-    b_task = asyncio.create_task(badass_indiana_chat(prompt, lang))
-    c_task = asyncio.create_task(light_indiana_chat(prompt, lang))
-
-    try:
-        b_resp = await b_task
-    except Exception as e:
-        logger.error("Indiana-B failed: %s", e)
-
-    try:
-        c_resp = await c_task
-    except Exception as e:
-        logger.error("Indiana-C failed: %s", e)
-        try:
-            c_resp = await light_indiana_chat_openrouter(prompt, lang)
-        except Exception as e2:
-            logger.error("Indiana-C fallback failed: %s", e2)
 
     final_prompt = f"User asked: {prompt}\n"
     if b_resp:
@@ -53,8 +36,8 @@ async def run_rawthinking(prompt: str, lang: str) -> tuple[str, str | None, str 
     if c_resp:
         final_prompt += f"Indiana-C replied: {c_resp}\n"
     final_prompt += (
-        "Summarize Indiana-B's and Indiana-C's replies separately. "
-        "Afterward, provide your own final conclusion for the user."
+        "Summarize Indiana-B's and Indiana-C's replies separately in about half the words "
+        "for each. Afterward, provide your own final conclusion for the user."
     )
 
     final_resp = "— no connection —"
@@ -65,7 +48,9 @@ async def run_rawthinking(prompt: str, lang: str) -> tuple[str, str | None, str 
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are Indiana, synthesizing insights with balance.",
+                        "content": (
+                            f"You are Indiana, synthesizing insights with balance. Respond only in {lang}."
+                        ),
                     },
                     {"role": "user", "content": final_prompt},
                 ],
@@ -108,4 +93,37 @@ async def run_rawthinking(prompt: str, lang: str) -> tuple[str, str | None, str 
     except Exception as e:
         logger.error("Failed to log rawthinking: %s", e)
 
+    return final_reply
+
+
+async def run_rawthinking(prompt: str, lang: str) -> tuple[str, str | None, str | None]:
+    """Run Indiana-B, Indiana-C, and synthesise a final answer.
+
+    Returns a tuple ``(final, b_resp, c_resp)`` where ``final`` is the main
+    Indiana's reply (already passed through ``assemble_final_reply``) and the
+    other elements contain raw responses from Indiana-B and Indiana-C. Even if
+    one of the sub-agents fails, a final answer is produced from the available
+    responses without exposing errors to the caller.
+    """
+
+    b_resp = c_resp = None
+
+    b_task = asyncio.create_task(badass_indiana_chat(prompt, lang))
+    c_task = asyncio.create_task(light_indiana_chat(prompt, lang))
+
+    try:
+        b_resp = await b_task
+    except Exception as e:
+        logger.error("Indiana-B failed: %s", e)
+
+    try:
+        c_resp = await c_task
+    except Exception as e:
+        logger.error("Indiana-C failed: %s", e)
+        try:
+            c_resp = await light_indiana_chat_openrouter(prompt, lang)
+        except Exception as e2:
+            logger.error("Indiana-C fallback failed: %s", e2)
+
+    final_reply = await synthesize_final(prompt, b_resp, c_resp, lang)
     return final_reply, b_resp, c_resp

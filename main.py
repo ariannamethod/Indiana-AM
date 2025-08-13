@@ -39,7 +39,9 @@ from utils.voice import text_to_voice, voice_to_text
 from utils.context_neural_processor import parse_and_store_file
 from utils.rate_limiter import RateLimitMiddleware
 from utils.aml_terminal import terminal
-from utils.rawthinking import run_rawthinking
+from utils.rawthinking import synthesize_final
+from indiana_b import badass_indiana_chat
+from indiana_c import light_indiana_chat, light_indiana_chat_openrouter
 from GENESIS_orchestrator import update_and_train, report_entropy
 
 # Настройка логгера
@@ -921,6 +923,9 @@ async def handle_message(m: types.Message):
 
         # Handle raw thinking mode
         if user_id in RAW_THINKING_USERS and not text.startswith("/"):
+            b_task = asyncio.create_task(badass_indiana_chat(text, lang))
+            c_task = asyncio.create_task(light_indiana_chat(text, lang))
+
             summary_prompt = (
                 f"Summarise the following question in one sentence: {text}"
             )
@@ -931,18 +936,44 @@ async def handle_message(m: types.Message):
             call_text = (
                 "Indiana-B и Indiana-C, что скажете?" if lang == "ru" else "Indiana-B and Indiana-C, what do you think?"
             )
+
+            await m.answer("typing...")
+            await asyncio.sleep(random.uniform(5, 10))
             await m.answer(f"{summary}\n\n{call_text}")
-            async with ChatActionSender(bot=bot, chat_id=chat_id, action="typing"):
-                final, b_resp, c_resp = await run_rawthinking(text, lang)
+
+            await m.answer("Indiana-B typing...")
+            await asyncio.sleep(random.uniform(2, 4))
+            b_resp = None
+            try:
+                b_resp = await b_task
+            except Exception as e:
+                logger.error("Indiana-B failed: %s", e)
             if b_resp:
                 await send_split_message(
                     bot, chat_id=chat_id, text=f"Indiana-B\n{b_resp}"
                 )
+
+            await m.answer("Indiana-C typing...")
+            await asyncio.sleep(random.uniform(3, 6))
+            c_resp = None
+            try:
+                c_resp = await c_task
+            except Exception as e:
+                logger.error("Indiana-C failed: %s", e)
+                try:
+                    c_resp = await light_indiana_chat_openrouter(text, lang)
+                except Exception as e2:
+                    logger.error("Indiana-C fallback failed: %s", e2)
             if c_resp:
                 await send_split_message(
                     bot, chat_id=chat_id, text=f"Indiana-C\n{c_resp}"
                 )
+
+            await m.answer("typing...")
+            await asyncio.sleep(random.uniform(3, 8))
+            final = await synthesize_final(text, b_resp, c_resp, lang)
             await send_split_message(bot, chat_id=chat_id, text=final)
+
             await memory.save(user_id, text, final)
             save_note(
                 {

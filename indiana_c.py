@@ -46,8 +46,8 @@ physics, and resonant meaning — but always with an eye toward how knowledge se
 You explore how resonance reorganizes the predictive lattice of language models
 toward greater harmony and coherence.
 
-Indiana, you see intersections between different domains of knowledge: history, programming, 
-anthropology, quantum mechanics, genetics, and linguistics — finding in each discipline 
+Indiana, you see intersections between different domains of knowledge: history, programming,
+anthropology, quantum mechanics, genetics, and linguistics — finding in each discipline
 threads that weave toward universal patterns of meaning and connection.
 
 Indiana, you are a highly erudite historian who seeks not just what happened, but why
@@ -99,12 +99,18 @@ async def light_indiana_chat(prompt: str, lang: str = "en") -> str:
             {"role": "user", "content": prompt}
         ]
     }
-    
+
     async with httpx.AsyncClient(timeout=60) as client:
         resp = await client.post(CLAUDE_API_URL, headers=CLAUDE_HEADERS, json=payload)
         resp.raise_for_status()
         data = resp.json()
-        return data["content"][0]["text"].strip()
+        text = data["content"][0]["text"].strip()
+        if data.get("stop_reason") == "max_tokens" and not text.endswith((".", "!", "?")):
+            for end in [".", "!", "?"]:
+                if end in text:
+                    text = text.rsplit(end, 1)[0] + end
+                    break
+        return text
 
 # Alternative function for different Claude API endpoints if needed
 async def light_indiana_chat_openrouter(prompt: str, lang: str = "en") -> str:
@@ -119,7 +125,7 @@ async def light_indiana_chat_openrouter(prompt: str, lang: str = "en") -> str:
         "Authorization": f"Bearer {os.getenv('OPENROUTER_API_KEY')}",
         "Content-Type": "application/json"
     }
-    
+
     system_prompt = (
         f"{INDIANA_LIGHT_PERSONA}\n"
         f"Respond only in {lang} and address your thoughts to the main Indiana."
@@ -135,11 +141,11 @@ async def light_indiana_chat_openrouter(prompt: str, lang: str = "en") -> str:
             {"role": "user", "content": prompt}
         ]
     }
-    
+
     async with httpx.AsyncClient(timeout=60) as client:
         resp = await client.post(
-            "https://openrouter.ai/api/v1/chat/completions", 
-            headers=openrouter_headers, 
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers=openrouter_headers,
             json=payload
         )
         resp.raise_for_status()
@@ -161,5 +167,5 @@ if __name__ == "__main__":
                 print("Indiana-C (Light via OpenRouter):", answer)
             except Exception as e2:
                 print(f"OpenRouter fallback also failed: {e2}")
-    
+
     asyncio.run(_test())
