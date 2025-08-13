@@ -48,11 +48,14 @@ async def test_rawthinking_chain(monkeypatch):
     async def fake_gravity(*a, **k):
         return "G thoughts"
 
-    async def fake_synth(prompt, b, c, d, g, lang):
-        return "final answer"
+    call_counter = {"count": 0}
 
     async def fake_assemble(prompt, draft, lang):
-        return draft
+        call_counter["count"] += 1
+        return "final answer"
+
+    async def fake_synth(prompt, b, c, d, g, lang):
+        return await fake_assemble(prompt, "draft", lang)
 
     async def fake_memory_save(*a, **k):
         return None
@@ -71,8 +74,8 @@ async def test_rawthinking_chain(monkeypatch):
     monkeypatch.setattr(main, "light_indiana_chat", fake_light)
     monkeypatch.setattr(main, "techno_indiana_chat", fake_techno)
     monkeypatch.setattr(main, "gravity_indiana_chat", fake_gravity)
-    monkeypatch.setattr(main, "synthesize_final", fake_synth)
     monkeypatch.setattr(main, "assemble_final_reply", fake_assemble)
+    monkeypatch.setattr(main, "synthesize_final", fake_synth)
     monkeypatch.setattr(main, "memory", SimpleNamespace(save=fake_memory_save))
     monkeypatch.setattr(main, "save_note", lambda *a, **k: None)
     monkeypatch.setattr(main, "process_with_assistant", fake_process_with_assistant)
@@ -103,4 +106,5 @@ async def test_rawthinking_chain(monkeypatch):
         "Indiana-G\nG thoughts",
         "final answer",
     ]
+    assert call_counter["count"] == 1
     main.RAW_THINKING_USERS.clear()

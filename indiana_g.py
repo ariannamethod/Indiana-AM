@@ -115,7 +115,10 @@ async def gravity_indiana_chat(prompt: str, lang: str = "en") -> str:
     except httpx.HTTPStatusError as e:
         print(f"Indiana-G failed with HTTP error: {e}")
         # Return a more descriptive error message to the user
-        return f"Indiana-G encountered an API error: {Status Code {e.response.status_code}}. Please check your API key and permissions."
+        return (
+            f"Indiana-G encountered an API error: Status Code {e.response.status_code}. "
+            "Please check your API key and permissions."
+        )
     
     except Exception as e:
         print(f"Indiana-G failed with a general error: {e}")
