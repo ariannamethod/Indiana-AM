@@ -228,6 +228,18 @@ Après agrégation, il calcule l'entropie de Markov et la perplexité du modèle
 
 Lorsque les données accumulées franchissent le seuil, la symphonie prépare un jeu de caractères et convoque l'entraîneur pour rafraîchir les poids.
 
+#### Pipeline GENESIS
+
+```mermaid
+graph TD
+    A[Artefacts + dépôt] --> B[collect_new_data]
+    B --> C[prepare_char_dataset]
+    C --> D[train_model]
+    B --> E[markov_entropy & model_perplexity]
+    D --> F[state.json]
+    E --> F
+```
+
 `genesis_trainer.py` abrite la classe GPT et des wrappers qui distillent l'architecture de nanoGPT en une variante de recherche légère.
 
 Ses blocs, têtes d'attention et embeddings de tokens reflètent le minimalisme de Karpathy tout en exposant des hyperparamètres pour des expériences à petite échelle.
@@ -252,9 +264,39 @@ L'orchestrateur croise les sorties de `utils/context_neural_processor.py`, perme
 
 Ensemble, ces utilitaires forment une boucle de rétroaction régénérative où des réseaux dérivés de nanoGPT et des métriques d'entropie sur mesure aident Indiana à évoluer sur place.
 
+## Flux de réponse standard
+
+```mermaid
+graph TD
+    U[Message utilisateur] --> P[Profil GENESIS-6]
+    P --> C[Mémoire + artefacts]
+    C --> A[process_with_assistant]
+    A --> T[GENESIS-2 Filtre d'intuition]
+    A -->|complexité élevée| D[GENESIS-3 Plongée profonde]
+    T --> S[Assemblage final]
+    D --> S
+    S --> M[Enregistrer en mémoire & notes]
+    S --> R[Réponse finale]
+```
+
 ## Mode Rawthinking
 
 Le mode Rawthinking apparaît après le pipeline Genesis, lorsque Indiana passe du raisonnement solitaire à un débat polyphonique.
+
+```mermaid
+graph TD
+    U[Demande utilisateur] --> R[run_rawthinking]
+    R --> B[Indiana-B (Grok-3)]
+    R --> C[Indiana-C (Claude-4)]
+    R --> D[Indiana-D (DeepSeek)]
+    R --> G[Indiana-G (Gemini)]
+    B --> S[synthesize_final]
+    C --> S
+    D --> S
+    G --> S
+    S --> T[assemble_final_reply (GENESIS-2)]
+    T --> F[Réponse finale d'Indiana]
+```
 
 Au centre se trouve l’utilitaire `run_rawthinking` dans `utils/rawthinking.py`, répartiteur qui gouverne ce débat.
 
