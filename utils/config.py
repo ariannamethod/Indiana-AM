@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 import os
 
-
 def _get_vector_store_max_size() -> int | None:
     value = os.getenv("VECTOR_STORE_MAX_SIZE")
     if value is None:
