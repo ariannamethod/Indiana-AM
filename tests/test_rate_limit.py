@@ -43,3 +43,11 @@ async def test_rate_limiter_stops_responses(monkeypatch):
 
     assert m.answers, "warning should be sent when rate limit exceeded"
     assert "слишком часто" in m.answers[0].lower()
+
+
+def test_timestamp_list_capped():
+    USER_MESSAGE_TIMES._data.clear()
+    user_id = "123"
+    for _ in range(RATE_LIMIT * 2):
+        is_rate_limited(user_id)
+    assert len(USER_MESSAGE_TIMES.get(user_id, [])) == RATE_LIMIT

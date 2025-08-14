@@ -133,8 +133,10 @@ def is_rate_limited(user_id: str, now: datetime | None = None) -> bool:
     timestamps = USER_MESSAGE_TIMES.get(user_id, [])
     timestamps = [ts for ts in timestamps if now - ts < RATE_PERIOD]
     timestamps.append(now)
+    is_limited = len(timestamps) > RATE_LIMIT
+    timestamps = timestamps[-RATE_LIMIT:]
     USER_MESSAGE_TIMES.set(user_id, timestamps)
-    return len(timestamps) > RATE_LIMIT
+    return is_limited
 
 complexity_logger = ThoughtComplexityLogger()
 
