@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 import sys
 from pathlib import Path
@@ -14,6 +15,8 @@ class AriannaTerminal:
         self.data_dir = data_dir
         self.proc: asyncio.subprocess.Process | None = None
         self._lock = asyncio.Lock()
+        self._cg_dir: Path | None = None
+        self.restart_count = 0
 
     def _apply_cgroup_limits(self, pid: int) -> None:
         cpu_limit = os.getenv("LETSGO_CPU_LIMIT")
@@ -22,6 +25,7 @@ class AriannaTerminal:
             return
         root = Path(os.getenv("LETSGO_CGROUP_ROOT", "/sys/fs/cgroup"))
         cg_dir = root / f"arianna_terminal_{pid}"
+        self._cg_dir = cg_dir
         try:
             cg_dir.mkdir(parents=True, exist_ok=True)
             if mem_limit:
@@ -61,12 +65,29 @@ class AriannaTerminal:
                 break
             buf += chunk
 
+    def is_running(self) -> bool:
+        return bool(self.proc) and self.proc.returncode is None
+
     async def run(self, cmd: str) -> str:
         real_cmd = cmd[5:] if cmd.startswith("/run ") else cmd
         allowed, reason = validate_command(real_cmd)
         if not allowed:
             log_blocked(real_cmd, reason)
             return "Терминал закрыт"
+        if not self.is_running():
+            if self.proc and self.proc.returncode is not None:
+                logging.info(
+                    "AriannaTerminal process exited with code %s, restarting",
+                    self.proc.returncode,
+                )
+                self.restart_count += 1
+                if self._cg_dir:
+                    try:
+                        self._cg_dir.rmdir()
+                    except OSError:
+                        pass
+                    self._cg_dir = None
+            self.proc = None
         await self._ensure_started()
         if not self.proc or not self.proc.stdin or not self.proc.stdout:
             raise RuntimeError("process not started")
@@ -100,6 +121,14 @@ class AriannaTerminal:
             except ProcessLookupError:
                 pass
             self.proc = None
+        if self._cg_dir:
+            try:
+                self._cg_dir.rmdir()
+            except OSError:
+                pass
+            self._cg_dir = None
+        if self.restart_count:
+            logging.info("AriannaTerminal restarted %d times", self.restart_count)
 
 
 terminal = AriannaTerminal()
