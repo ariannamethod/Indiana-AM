@@ -22,6 +22,15 @@ async def test_memory_save_and_retrieve(tmp_path):
     async with MemoryManager(db_path=str(db_path), vectorstore=store) as memory:
         assert await memory.save("u1", "q1", "r1")
 
+        # ensure data stored in plain text when encryption disabled
+        db = await memory.connect()
+        async with db.execute(
+            "SELECT query, response, encryption_version FROM memory WHERE user_id=?",
+            ("u1",),
+        ) as cur:
+            row = await cur.fetchone()
+        assert row == ("q1", "r1", 0)
+
         retrieved = await memory.retrieve("u1", "q1")
         assert "r1" in retrieved
 
@@ -75,3 +84,28 @@ async def test_connection_closed_after_context(tmp_path):
     async with MemoryManager(db_path=str(db_path)) as memory:
         await memory.save("u1", "q1", "r1")
     assert memory._db is None
+
+
+@pytest.mark.asyncio
+async def test_memory_save_and_retrieve_encrypted(tmp_path, monkeypatch):
+    db_path = tmp_path / "memory.db"
+    vec_path = tmp_path / "vector.json"
+    monkeypatch.setenv("MEMORY_ENCRYPTION_KEY", "secret")
+    store = LocalVectorStore(persist_path=str(vec_path))
+    async with MemoryManager(db_path=str(db_path), vectorstore=store) as memory:
+        assert await memory.save("u1", "q1", "r1")
+
+        db = await memory.connect()
+        async with db.execute(
+            "SELECT query, response, encryption_version FROM memory WHERE user_id=?",
+            ("u1",),
+        ) as cur:
+            row = await cur.fetchone()
+        assert row[2] == 1
+        assert row[0] != "q1" and row[1] != "r1"
+
+        retrieved = await memory.retrieve("u1", "q1")
+        assert retrieved == "r1"
+
+        recent = await memory.recent_messages()
+        assert recent == [("q1", "r1")]
