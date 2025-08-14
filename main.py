@@ -271,11 +271,20 @@ async def cleanup_old_voice_files():
             VOICE_DIR.mkdir(exist_ok=True)
             cutoff = datetime.now(timezone.utc) - timedelta(days=30)
             for f in VOICE_DIR.glob("*"):
-                if f.is_file() and datetime.fromtimestamp(f.stat().st_mtime, timezone.utc) < cutoff:
+                if (
+                    f.is_file()
+                    and datetime.fromtimestamp(
+                        f.stat().st_mtime, timezone.utc
+                    ) < cutoff
+                ):
                     f.unlink()
         except Exception as e:
             logger.error(f"Voice cleanup error: {e}")
-        await asyncio.sleep(86400)
+        try:
+            await asyncio.sleep(86400)
+        except asyncio.CancelledError:
+            logger.info("Voice cleanup task cancelled")
+            break
 
 
 async def cleanup_user_langs():
@@ -285,7 +294,11 @@ async def cleanup_user_langs():
             USER_LANGS.cleanup(LANG_CACHE_TTL)
         except Exception as e:
             logger.error(f"Lang cache cleanup error: {e}")
-        await asyncio.sleep(3600)
+        try:
+            await asyncio.sleep(3600)
+        except asyncio.CancelledError:
+            logger.info("User language cleanup task cancelled")
+            break
 
 
 async def cleanup_user_states():
@@ -298,7 +311,11 @@ async def cleanup_user_states():
             RAW_THINKING_USERS.cleanup(USER_STATE_TTL)
         except Exception as e:
             logger.error(f"User state cleanup error: {e}")
-        await asyncio.sleep(USER_STATE_TTL)
+        try:
+            await asyncio.sleep(USER_STATE_TTL)
+        except asyncio.CancelledError:
+            logger.info("User state cleanup task cancelled")
+            break
 
 
 async def genesis1_daily_task():
@@ -310,28 +327,34 @@ async def genesis1_daily_task():
         except Exception:
             used = set()
     while True:
-        if len(used) >= 86400:
-            used.clear()
-        sec = random.randint(0, 86399)
-        while sec in used:
+        try:
+            if len(used) >= 86400:
+                used.clear()
             sec = random.randint(0, 86399)
-        used.add(sec)
-        GENESIS1_SCHEDULE_FILE.parent.mkdir(exist_ok=True)
-        GENESIS1_SCHEDULE_FILE.write_text(json.dumps(list(used)))
-        now = datetime.now(timezone.utc)
-        run_time = datetime.combine(now.date(), datetime.min.time(), tzinfo=timezone.utc) + timedelta(seconds=sec)
-        if run_time <= now:
-            run_time += timedelta(days=1)
-        await asyncio.sleep((run_time - now).total_seconds())
-        digest = await run_genesis1()
-        if digest:
-            save_note({"time": datetime.now(timezone.utc).isoformat(), "genesis1": digest})
-            try:
-                twist = await genesis2_sonar_filter(digest, digest, "en")
-                msg = f"☝🏻 {digest}\n\n🜂 Investigative Twist → {twist}"
-                await send_split_message(bot, chat_id=AGENT_GROUP, text=msg)
-            except Exception as e:
-                logger.error(f"Genesis1 send failed: {e}")
+            while sec in used:
+                sec = random.randint(0, 86399)
+            used.add(sec)
+            GENESIS1_SCHEDULE_FILE.parent.mkdir(exist_ok=True)
+            GENESIS1_SCHEDULE_FILE.write_text(json.dumps(list(used)))
+            now = datetime.now(timezone.utc)
+            run_time = datetime.combine(
+                now.date(), datetime.min.time(), tzinfo=timezone.utc
+            ) + timedelta(seconds=sec)
+            if run_time <= now:
+                run_time += timedelta(days=1)
+            await asyncio.sleep((run_time - now).total_seconds())
+            digest = await run_genesis1()
+            if digest:
+                save_note({"time": datetime.now(timezone.utc).isoformat(), "genesis1": digest})
+                try:
+                    twist = await genesis2_sonar_filter(digest, digest, "en")
+                    msg = f"☝🏻 {digest}\n\n🜂 Investigative Twist → {twist}"
+                    await send_split_message(bot, chat_id=AGENT_GROUP, text=msg)
+                except Exception as e:
+                    logger.error(f"Genesis1 send failed: {e}")
+        except asyncio.CancelledError:
+            logger.info("Genesis1 daily task cancelled")
+            break
 
 
 async def run_deep_dive(chat_id: int, user_id: str, query: str, lang: str) -> None:
@@ -1171,12 +1194,17 @@ async def on_startup(app):
 
 async def on_shutdown(app):
     """Cleanup on shutdown."""
+    global task_group
     try:
         if task_group is not None:
+            for task in background_tasks:
+                task.cancel()
             try:
                 await task_group.__aexit__(None, None, None)
             except* Exception:
                 pass
+            else:
+                task_group = None
             for task in background_tasks:
                 exc = task.get_exception() if hasattr(task, "get_exception") else task.exception()
                 if exc:
