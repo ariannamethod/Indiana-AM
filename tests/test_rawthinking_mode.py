@@ -31,7 +31,7 @@ class DummyMessage:
 
 @pytest.mark.asyncio
 async def test_rawthinking_chain(monkeypatch):
-    main.RAW_THINKING_USERS.set("123", datetime.now(timezone.utc).isoformat())
+    await main.RAW_THINKING_USERS.set("123", datetime.now(timezone.utc).isoformat())
     main.EMERGENCY_MODE = False
     m = DummyMessage("What is life?")
     
@@ -82,7 +82,11 @@ async def test_rawthinking_chain(monkeypatch):
     monkeypatch.setattr(main, "save_note", lambda *a, **k: None)
     monkeypatch.setattr(main, "process_with_assistant", fake_process_with_assistant)
     monkeypatch.setattr(main, "send_split_message", fake_send_split_message)
-    monkeypatch.setattr(main, "is_rate_limited", lambda *a, **k: False)
+
+    async def fake_is_rate_limited(*a, **k):
+        return False
+
+    monkeypatch.setattr(main, "is_rate_limited", fake_is_rate_limited)
     monkeypatch.setattr(asyncio, "sleep", fake_sleep)
 
     class DummyChatActionSender:

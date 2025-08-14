@@ -30,7 +30,7 @@ class RateLimitMiddleware(BaseMiddleware):
         if isinstance(event, Message) and event.from_user:
             user_id = str(event.from_user.id)
             now = time.time()
-            timestamps: Deque[float] = self._users.get(user_id, deque())
+            timestamps: Deque[float] = await self._users.get(user_id, deque())
 
             # drop outdated timestamps
             while timestamps and now - timestamps[0] > self.window:
@@ -44,5 +44,5 @@ class RateLimitMiddleware(BaseMiddleware):
                 return None
 
             timestamps.append(now)
-            self._users.set(user_id, timestamps)
+            await self._users.set(user_id, timestamps)
         return await handler(event, data)

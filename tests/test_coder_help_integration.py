@@ -36,7 +36,7 @@ class DummySender:
 async def test_coder_help_returns_core_commands(monkeypatch):
     main.CODER_USERS.clear()
     m = DummyMessage("/help")
-    main.CODER_USERS.set(str(m.from_user.id), datetime.now(timezone.utc).isoformat())
+    await main.CODER_USERS.set(str(m.from_user.id), datetime.now(timezone.utc).isoformat())
 
     monkeypatch.setattr(main, "ChatActionSender", lambda **kwargs: DummySender())
 
@@ -58,7 +58,11 @@ async def test_coder_help_returns_core_commands(monkeypatch):
     monkeypatch.setattr(main, "memory", SimpleNamespace(save=fake_memory_save))
     monkeypatch.setattr(main, "save_note", lambda *a, **k: None)
     monkeypatch.setattr(main, "format_core_commands", lambda: "core help")
-    monkeypatch.setattr(main, "is_rate_limited", lambda *a, **k: False)
+
+    async def fake_is_rate_limited(*a, **k):
+        return False
+
+    monkeypatch.setattr(main, "is_rate_limited", fake_is_rate_limited)
     monkeypatch.setattr(main, "send_split_message", fake_send_split_message)
     monkeypatch.setattr(random, "random", lambda: 1.0)
 
@@ -71,9 +75,9 @@ async def test_coder_help_returns_core_commands(monkeypatch):
 @pytest.mark.asyncio
 async def test_coder_ignored_during_rawthinking():
     main.CODER_USERS.clear()
-    main.RAW_THINKING_USERS.set("123", datetime.now(timezone.utc).isoformat())
+    await main.RAW_THINKING_USERS.set("123", datetime.now(timezone.utc).isoformat())
     m = DummyMessage("/coder")
     await main.enable_coder(m)
     assert m.answers == []
-    assert main.CODER_USERS.get("123") is None
+    assert await main.CODER_USERS.get("123") is None
     main.RAW_THINKING_USERS.clear()
