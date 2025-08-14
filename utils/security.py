@@ -59,12 +59,14 @@ SUSPICIOUS_PATTERNS = [
 SUSPICIOUS_REGEXES = [re.compile(p, re.IGNORECASE) for p in SUSPICIOUS_PATTERNS]
 
 
-def validate_command(command: str) -> tuple[bool, str | None]:
+def validate_command(
+    command: str, user_id: str | None = None
+) -> tuple[bool, str | None]:
     """Validate a shell command against a whitelist.
 
     Returns a tuple ``(allowed, reason)`` where ``allowed`` indicates whether the
     command is permitted. ``reason`` contains the block reason when ``allowed`` is
-    ``False``.
+    ``False``. ``user_id`` is reserved for future use.
     """
 
     if any(regex.search(command) for regex in SUSPICIOUS_REGEXES):
@@ -101,20 +103,23 @@ def validate_command(command: str) -> tuple[bool, str | None]:
     return True, None
 
 
-def log_blocked(command: str, reason: str) -> None:
-    """Log a blocked command attempt with the reason."""
+def log_blocked(command: str, reason: str, user_id: str | None = None) -> None:
+    """Log a blocked command attempt with the reason and optional user ID."""
 
-    logger.error("Blocked command: %s - %s", command, reason)
+    if user_id:
+        logger.error("Blocked command from %s: %s - %s", user_id, command, reason)
+    else:
+        logger.error("Blocked command: %s - %s", command, reason)
     for handler in logger.handlers:
         handler.flush()
 
 
-def is_blocked(command: str) -> bool:
+def is_blocked(command: str, user_id: str | None = None) -> bool:
     """Return ``True`` if a command is disallowed and log the reason."""
 
-    allowed, reason = validate_command(command)
+    allowed, reason = validate_command(command, user_id)
     if not allowed:
-        log_blocked(command, reason or "unknown reason")
+        log_blocked(command, reason or "unknown reason", user_id)
     return not allowed
 
 
