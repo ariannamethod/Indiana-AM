@@ -28,7 +28,7 @@ async def test_rate_limiter_stops_responses(monkeypatch):
     USER_MESSAGE_TIMES._data.clear()
     user_id = str(123)
     for _ in range(RATE_LIMIT):
-        assert not is_rate_limited(user_id)
+        assert not await is_rate_limited(user_id)
 
     m = DummyMessage()
     import main
