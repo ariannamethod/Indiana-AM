@@ -66,6 +66,25 @@ def test_kernel_exec_logs_suspicious_sequences(monkeypatch, tmp_path):
     assert "Suspicious" in content
 
 
+def test_terminal_run_blocks_malicious_command(monkeypatch, tmp_path):
+    monkeypatch.setenv("LETSGO_DATA_DIR", str(tmp_path))
+    log_file = Path("artefacts/blocked_commands.log")
+    if log_file.exists():
+        log_file.write_text("", encoding="utf-8")
+
+    async def _run() -> tuple[str, bool]:
+        result = await terminal.run("rm -rf /")
+        started = terminal.proc is not None
+        await terminal.stop()
+        return result, started
+
+    result, started = asyncio.run(_run())
+    assert "Терминал закрыт" in result
+    assert not started
+    assert log_file.exists()
+    assert "rm -rf /" in log_file.read_text(encoding="utf-8")
+
+
 def test_cgroup_limits(monkeypatch, tmp_path):
     monkeypatch.setenv("LETSGO_DATA_DIR", str(tmp_path))
     monkeypatch.setenv("LETSGO_CGROUP_ROOT", str(tmp_path))
