@@ -12,7 +12,7 @@ Namespaces form disjoint sets (N_i) partitioning process views of system resourc
 
 Cgroup hierarchies create a tree (T) with resource limits as edge weights, facilitating precise control over CPU and memory distribution.
 
-Python 3.10+ is included for scriptability, and its virtual environment tool venv allows isolation comparable to constructing subspaces within a vector space.
+Python 3.11+ is included for scriptability, and its virtual environment tool venv allows isolation comparable to constructing subspaces within a vector space.
 
 Node.js 18+ complements Python, providing asynchronous I/O modeled as a non-blocking function (f: E \to E) where events map to themselves after processing.
 

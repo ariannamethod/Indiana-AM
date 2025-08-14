@@ -29,7 +29,7 @@ Loads with a minimal initramfs (based on Alpine minirootfs), reducing boot compl
 **ext4** as the default persistent store; journaling function J(t) ≈ bounded integral, protecting data under power loss.
 **Namespaces** (Nᵢ) for process/resource isolation, safe multitenancy.
 **Cgroup hierarchies** for resource trees (T), precise CPU/RAM control.
-**Python 3.10+** included, `venv` isolation equals “vector subspaces.”
+**Python 3.11+** required, `venv` isolation equals “vector subspaces.”
 **Node.js 18+** for async I/O, modeled as f: E → E.
 **Minimal toolkit:** bash, curl, nano—each is a vertex in the dependency graph, no bloat.
 
@@ -511,6 +511,8 @@ Papers cited include: Dynamic Neural Field Theory (Atasoy 2017), Distributed Cog
 ---
 
 ## 9. Quick Start
+
+Requires **Python 3.11+**.
 
 ```bash
 git clone https://github.com/ariannamethod/Indiana-AM.git
