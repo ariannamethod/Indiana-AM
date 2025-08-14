@@ -68,11 +68,11 @@ class AriannaTerminal:
     def is_running(self) -> bool:
         return bool(self.proc) and self.proc.returncode is None
 
-    async def run(self, cmd: str) -> str:
+    async def run(self, cmd: str, user_id: str | None = None) -> str:
         real_cmd = cmd[5:] if cmd.startswith("/run ") else cmd
-        allowed, reason = validate_command(real_cmd)
+        allowed, reason = validate_command(real_cmd, user_id)
         if not allowed:
-            log_blocked(real_cmd, reason)
+            log_blocked(real_cmd, reason, user_id)
             return "Терминал закрыт"
         if not self.is_running():
             if self.proc and self.proc.returncode is not None:
