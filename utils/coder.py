@@ -146,21 +146,21 @@ async def generate_code(request: str) -> DraftResponse:
     return await CODER_SESSION.draft(request)
 
 
-async def kernel_exec(command: str) -> str:
+async def kernel_exec(command: str, user_id: str | None = None) -> str:
     """Run a shell command through the AM-Linux kernel via letsgo.
 
     The command is executed inside the Arianna core environment and all
     activity is logged under ``/arianna_core/log``.
     """
-    allowed, reason = validate_command(command)
+    allowed, reason = validate_command(command, user_id)
     if not allowed:
-        log_blocked(command, reason)
+        log_blocked(command, reason, user_id)
         base = "Ты и правда думал, что это сработает? Нет, дружище! Терминал закрыт."
         twist = await genesis2_sonar_filter(command, base, "ru")
         message = f"{base} {twist}".strip()
         await terminal.stop()
         return message
-    return await terminal.run(f"/run {command}")
+    return await terminal.run(f"/run {command}", user_id)
 
 
 __all__ = [

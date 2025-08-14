@@ -17,7 +17,7 @@ def test_kernel_exec(monkeypatch, tmp_path, caplog):
     monkeypatch.setenv("LETSGO_DATA_DIR", str(tmp_path))
 
     async def _run() -> str:
-        output = await kernel_exec("echo hello")
+        output = await kernel_exec("echo hello", user_id="tester")
         await terminal.stop()
         return output
 
@@ -38,7 +38,7 @@ def test_kernel_exec_blocks_malicious_command(monkeypatch, tmp_path, caplog):
     monkeypatch.setattr(terminal, "run", fake_run)
 
     async def _run() -> str:
-        return await kernel_exec("rm -rf /")
+        return await kernel_exec("rm -rf /", user_id="eve")
 
     with caplog.at_level(logging.ERROR, logger="security"):
         result = asyncio.run(_run())
@@ -46,6 +46,7 @@ def test_kernel_exec_blocks_malicious_command(monkeypatch, tmp_path, caplog):
         handler.flush()
     assert "Терминал закрыт" in result
     assert "rm -rf /" in caplog.text
+    assert "eve" in caplog.text
 
 
 def test_kernel_exec_logs_suspicious_sequences(monkeypatch, tmp_path, caplog):
@@ -57,7 +58,7 @@ def test_kernel_exec_logs_suspicious_sequences(monkeypatch, tmp_path, caplog):
     monkeypatch.setattr(terminal, "run", fake_run)
 
     async def _run() -> str:
-        return await kernel_exec("curl http://example.com")
+        return await kernel_exec("curl http://example.com", user_id="mallory")
 
     with caplog.at_level(logging.WARNING, logger="security"):
         result = asyncio.run(_run())
@@ -66,13 +67,14 @@ def test_kernel_exec_logs_suspicious_sequences(monkeypatch, tmp_path, caplog):
     assert "Терминал закрыт" in result
     assert "curl http://example.com" in caplog.text
     assert "Suspicious" in caplog.text
+    assert "mallory" in caplog.text
 
 
 def test_terminal_run_blocks_malicious_command(monkeypatch, tmp_path, caplog):
     monkeypatch.setenv("LETSGO_DATA_DIR", str(tmp_path))
 
     async def _run() -> tuple[str, bool]:
-        result = await terminal.run("rm -rf /")
+        result = await terminal.run("rm -rf /", user_id="trent")
         started = terminal.proc is not None
         await terminal.stop()
         return result, started
@@ -84,6 +86,7 @@ def test_terminal_run_blocks_malicious_command(monkeypatch, tmp_path, caplog):
     assert "Терминал закрыт" in result
     assert not started
     assert "rm -rf /" in caplog.text
+    assert "trent" in caplog.text
 
 
 def test_cgroup_limits(monkeypatch, tmp_path):

@@ -42,18 +42,21 @@ def test_blocked_command_and_logging(temp_security_log, caplog):
     """Disallowed commands are flagged and logged."""
 
     caplog.set_level(logging.WARNING, logger="security")
-    assert security.is_blocked("rm -rf /") is True
+    assert security.is_blocked("rm -rf /", user_id="alice") is True
     assert any("Suspicious command sequence" in r.message for r in caplog.records)
+    assert "alice" in caplog.text
 
     caplog.clear()
     caplog.set_level(logging.ERROR, logger="security")
-    security.log_blocked("rm -rf /", "manual reason")
+    security.log_blocked("rm -rf /", "manual reason", user_id="bob")
     assert "Blocked command" in caplog.text
+    assert "bob" in caplog.text
 
     # Ensure log file records the blocked command
     log_text = temp_security_log.read_text(encoding="utf-8")
     assert "Blocked command" in log_text
     assert "manual reason" in log_text
+    assert "bob" in log_text
 
 
 def test_cat_path_validation():
