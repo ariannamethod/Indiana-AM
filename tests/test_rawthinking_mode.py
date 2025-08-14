@@ -31,6 +31,7 @@ class DummyMessage:
 @pytest.mark.asyncio
 async def test_rawthinking_chain(monkeypatch):
     main.RAW_THINKING_USERS.add("123")
+    main.EMERGENCY_MODE = False
     m = DummyMessage("What is life?")
     
     async def fake_genesis6_report(*a, **k):

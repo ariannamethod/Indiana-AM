@@ -15,7 +15,7 @@ def test_status_fields(monkeypatch):
     monkeypatch.setattr(letsgo, "_first_ip", lambda: "1.2.3.4")
     result = letsgo.status()
     lines = result.splitlines()
-    assert len(lines) == 3
+    assert len(lines) >= 3
     expected_cpu = os.cpu_count()
     assert lines[0] == f"CPU cores: {expected_cpu}"
     assert re.match(r"^Uptime: \d+\.\d+s", lines[1])

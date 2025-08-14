@@ -33,8 +33,8 @@ async def _fetch_last_day():
                     return metadata.get("date")
         elif hasattr(vector_store, "_store"):
             entry = vector_store._store.get("last-daily")
-            if entry and len(entry) >= 3 and entry[2]:
-                return entry[2].get("date")
+            if entry and len(entry) >= 4 and entry[3]:
+                return entry[3].get("date")
     except Exception as exc:
         logger.warning("Failed to fetch last daily log: %s", exc)
         return None
