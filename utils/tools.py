@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import re
+import textwrap
 from pathlib import Path
 
 from GENESIS_orchestrator import status_emoji
@@ -15,7 +16,7 @@ def sanitize_filename(filename: str) -> str:
     safe_name = re.sub(r"[^A-Za-z0-9._-]", "_", safe_name)
     return safe_name or "file"
 
-def split_message(text: str, max_length: int = 4000):
+def split_message(text: str, max_length: int = 4000, preserve_markdown: bool = True):
     """
     Разделяет сообщение на части, учитывая максимальную длину Telegram.
     Старается сохранять целостность абзацев и предложений.
@@ -27,44 +28,100 @@ def split_message(text: str, max_length: int = 4000):
     parts = []
     current_part = ""
 
-    # Разбиваем длинное сообщение на части, учитывая абзацы
-    paragraphs = text.split('\n\n')
+    # При необходимости учитываем границы Markdown/код-блоков
+    segments = (
+        re.split(r"(```.*?```)", text, flags=re.DOTALL)
+        if preserve_markdown
+        else [text]
+    )
 
-    for paragraph in paragraphs:
-        # Если абзац сам по себе длиннее максимального размера, его нужно разбить по предложениям
-        if len(paragraph) > max_length:
-            sentences = paragraph.replace('. ', '.<SPLIT>').split('<SPLIT>')
-            for sentence in sentences:
-                if len(current_part + "\n\n" + sentence) > max_length and current_part:
-                    parts.append(current_part.strip())
-                    current_part = sentence
-                else:
-                    if current_part:
-                        current_part += "\n\n" + sentence
-                    else:
-                        current_part = sentence
+    for segment in segments:
+        if not segment:
+            continue
 
-                # Проверяем не превышает ли текущая часть с одним предложением максимальную длину
-                if len(current_part) > max_length:
-                    # Если предложение длиннее максимума, разбиваем по словам
-                    while len(current_part) > max_length:
-                        cut = current_part.rfind(" ", 0, max_length)
-                        if cut < 0:
-                            cut = max_length
-                        parts.append(current_part[:cut].strip())
-                        current_part = current_part[cut:].strip()
-        else:
-            # Если с этим абзацем сообщение станет слишком длинным, начинаем новую часть
-            if len(current_part + "\n\n" + paragraph) > max_length and current_part:
+        # Обработка код-блоков как неделимых сегментов
+        if preserve_markdown and segment.startswith("```") and segment.endswith("```"):
+            if len(current_part + "\n\n" + segment) > max_length and current_part:
                 parts.append(current_part.strip())
-                current_part = paragraph
-            else:
-                if current_part:
-                    current_part += "\n\n" + paragraph
-                else:
-                    current_part = paragraph
+                current_part = ""
 
-    # Добавляем последнюю часть, если она не пустая
+            if len(segment) <= max_length:
+                current_part = (
+                    current_part + "\n\n" + segment if current_part else segment
+                )
+            else:
+                # Разбиваем длинный код-блок построчно
+                lines = segment.splitlines()
+                fence = lines[0]
+                closing = "```"
+                code_lines = lines[1:-1]
+                block = []
+                for line in code_lines:
+                    candidate = "\n".join(block + [line])
+                    chunk = f"{fence}\n{candidate}\n{closing}"
+                    if len(chunk) > max_length:
+                        if block:
+                            parts.append(f"{fence}\n{'\n'.join(block)}\n{closing}")
+                            block = [line]
+                        else:
+                            available = max_length - len(fence) - len(closing) - 2
+                            wrapped = textwrap.wrap(
+                                line,
+                                width=available,
+                                break_long_words=False,
+                                replace_whitespace=False,
+                            )
+                            for w in wrapped:
+                                parts.append(f"{fence}\n{w}\n{closing}")
+                            block = []
+                    else:
+                        block.append(line)
+                if block:
+                    parts.append(f"{fence}\n{'\n'.join(block)}\n{closing}")
+                current_part = ""
+        else:
+            # Разбиваем длинное сообщение на части, учитывая абзацы
+            paragraphs = segment.split("\n\n")
+            for paragraph in paragraphs:
+                if len(paragraph) > max_length:
+                    sentences = paragraph.replace('. ', '.<SPLIT>').split('<SPLIT>')
+                    for sentence in sentences:
+                        if (
+                            len(current_part + "\n\n" + sentence) > max_length
+                            and current_part
+                        ):
+                            parts.append(current_part.strip())
+                            current_part = sentence
+                        else:
+                            current_part = (
+                                current_part + "\n\n" + sentence
+                                if current_part
+                                else sentence
+                            )
+
+                        if len(current_part) > max_length:
+                            wrapped = textwrap.wrap(
+                                current_part,
+                                width=max_length,
+                                break_long_words=False,
+                                replace_whitespace=False,
+                            )
+                            parts.extend([w.strip() for w in wrapped[:-1]])
+                            current_part = wrapped[-1].strip()
+                else:
+                    if (
+                        len(current_part + "\n\n" + paragraph) > max_length
+                        and current_part
+                    ):
+                        parts.append(current_part.strip())
+                        current_part = paragraph
+                    else:
+                        current_part = (
+                            current_part + "\n\n" + paragraph
+                            if current_part
+                            else paragraph
+                        )
+
     if current_part:
         parts.append(current_part.strip())
 
@@ -76,6 +133,7 @@ async def send_split_message(
     text,
     parse_mode=None,
     delay: float = 0.5,
+    preserve_markdown: bool = True,
     **kwargs,
 ):
     """
@@ -96,7 +154,7 @@ async def send_split_message(
         # Добавляем многоточие, если сообщение кажется обрезанным
         text += "..."
 
-    parts = split_message(text)
+    parts = split_message(text, preserve_markdown=preserve_markdown)
     sent_messages = []
 
     logger.info(f"Split into {len(parts)} parts")
