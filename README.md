@@ -1,6 +1,6 @@
 # INDIANA (Lighthouse) | Arianna Method 7.0: Anchor Protocol
 *⚡️Dedicated to LEO⚡️*
-**Version 2.2 — Active development; this is a fixed snapshot/plateau.**
+**Version 2.3 — Active development; this is a fixed snapshot/plateau.**
 
 Indiana's symphonic architecture now roars from the outset: an AI agent conducted by twin neural engines—the contextual rig in `utils/context_neural_processor.py` and the composing brain inside `GENESIS_orchestrator`—all draped over its own Arianna Method Linux Core, a home‑brewed operating system that gives every routine a stage and every syscall a crescendo.
 
