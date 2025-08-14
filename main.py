@@ -34,13 +34,13 @@ from utils.complexity import (
     estimate_complexity_and_entropy,
 )
 from utils.logging_config import setup_logging
-from langdetect import detect, DetectorFactory, LangDetectException
 from utils.repo_monitor import RepoWatcher
 from utils.voice import text_to_voice, voice_to_text
 from utils.context_neural_processor import parse_and_store_file
 from utils.rate_limiter import RateLimitMiddleware
 from utils.aml_terminal import terminal
 from utils.rawthinking import synthesize_final
+from utils.language import detect_language, cleanup_user_langs
 from indiana_b import badass_indiana_chat
 from indiana_c import light_indiana_chat, light_indiana_chat_openrouter
 from indiana_d import techno_indiana_chat
@@ -113,10 +113,7 @@ async def memory_lifespan(app):
 # Lower the likelihood of spontaneous additions
 AFTERTHOUGHT_CHANCE = 0.02
 FOLLOWUP_CHANCE = 0.05
-DetectorFactory.seed = 0
 LANG_CACHE_MAXLEN = 1000
-LANG_CACHE_TTL = 30 * 24 * 60 * 60  # 30 days
-USER_LANGS = LRUCache(maxlen=LANG_CACHE_MAXLEN)
 USER_STATE_TTL = 60 * 60  # 1 hour
 VOICE_USERS = LRUCache(maxlen=LANG_CACHE_MAXLEN, ttl=USER_STATE_TTL)
 DIVE_WAITING = LRUCache(maxlen=LANG_CACHE_MAXLEN, ttl=USER_STATE_TTL)
@@ -140,32 +137,6 @@ LAST_MARKOV_ENTROPY = report_entropy()
 
 # Emergency mode routes all messages directly to the AM-Linux terminal.
 EMERGENCY_MODE = False
-
-
-async def get_user_language(
-    user_id: str, text: str, language_code: str | None = None
-) -> str:
-    """Detect and store the user's language for each message.
-
-    The detection strategy prioritizes the actual message content. If the text is
-    too short or ambiguous, it falls back to an optional ``language_code`` hint
-    and finally to a cached language for the user. This keeps behaviour
-    consistent across utilities and supports the language chosen by the user.
-    """
-
-    cached = await USER_LANGS.get(user_id)
-    lang = None
-    clean = re.sub(r"\W", "", text or "")
-    if len(clean) >= 3:
-        try:
-            lang = detect(text)
-        except LangDetectException:
-            lang = None
-    if language_code:
-        language_code = language_code.split("-")[0]
-    lang = lang or language_code or cached or "en"
-    await USER_LANGS.set(user_id, lang)
-    return lang
 
 
 async def genesis6_report(user_id: str, message: str, lang: str) -> dict:
@@ -275,16 +246,6 @@ async def cleanup_old_voice_files():
         except Exception as e:
             logger.error(f"Voice cleanup error: {e}")
         await asyncio.sleep(86400)
-
-
-async def cleanup_user_langs():
-    """Periodically drop inactive user language records."""
-    while True:
-        try:
-            await USER_LANGS.cleanup(LANG_CACHE_TTL)
-        except Exception as e:
-            logger.error(f"Lang cache cleanup error: {e}")
-        await asyncio.sleep(3600)
 
 
 async def cleanup_user_states():
@@ -593,7 +554,7 @@ async def delayed_followup(chat_id: int, user_id: str, prev_reply: str, original
             f"\nPREVIOUS >>> {prev_reply}"
         )
         context = await memory.retrieve(user_id, prev_reply)
-        lang = await get_user_language(user_id, original)
+        lang = await detect_language(user_id, original)
         draft = await process_with_assistant(prompt, context, lang)
         twist = await genesis2_sonar_filter(prev_reply, draft, lang)
         deep = ""
@@ -642,7 +603,7 @@ async def afterthought(chat_id: int, user_id: str, original: str, private: bool)
         )
 
         # Process with assistant instead of Sonar
-        lang = await get_user_language(user_id, original)
+        lang = await detect_language(user_id, original)
         artifact_ctx = artifact_cache.get_all_text()
         draft = await process_with_assistant(prompt, artifact_ctx + "\n" + context, lang)
         twist = await genesis2_sonar_filter(original, draft, lang)
@@ -693,7 +654,7 @@ async def enable_deep_mode(m: types.Message):
     """Enable persistent Genesis-3 deep dives."""
     global FORCE_DEEP_DIVE
     user_id = str(m.from_user.id)
-    lang = await get_user_language(user_id, m.text or "", m.from_user.language_code)
+    lang = await detect_language(user_id, m.text or "", m.from_user.language_code)
     await genesis6_report(user_id, m.text or "", lang)
     if await RAW_THINKING_USERS.get(user_id):
         templates = [
@@ -716,7 +677,7 @@ async def disable_deep_mode(m: types.Message):
     global FORCE_DEEP_DIVE
     FORCE_DEEP_DIVE = False
     user_id = str(m.from_user.id)
-    lang = await get_user_language(user_id, m.text or "", m.from_user.language_code)
+    lang = await detect_language(user_id, m.text or "", m.from_user.language_code)
     await genesis6_report(user_id, m.text or "", lang)
     await m.answer("☝🏻 deep mode disabled")
 
@@ -726,7 +687,7 @@ async def enable_voice(m: types.Message):
     """Enable voice responses for the user."""
     user_id = str(m.from_user.id)
     await VOICE_USERS.set(user_id, datetime.now(timezone.utc).isoformat())
-    lang = await get_user_language(user_id, m.text or "", m.from_user.language_code)
+    lang = await detect_language(user_id, m.text or "", m.from_user.language_code)
     await genesis6_report(user_id, m.text or "", lang)
     await m.answer("☝🏻 voice mode enabled")
 
@@ -736,7 +697,7 @@ async def disable_voice(m: types.Message):
     """Disable voice responses for the user."""
     user_id = str(m.from_user.id)
     await VOICE_USERS.delete(user_id)
-    lang = await get_user_language(user_id, m.text or "", m.from_user.language_code)
+    lang = await detect_language(user_id, m.text or "", m.from_user.language_code)
     await genesis6_report(user_id, m.text or "", lang)
     await m.answer("☝🏻 voice mode disabled")
 
@@ -749,7 +710,7 @@ async def command_dive(m: types.Message):
     """Trigger Perplexity search via /dive command."""
     user_id = str(m.from_user.id)
     query = m.text[5:].strip() if m.text else ""
-    lang = await get_user_language(user_id, query, m.from_user.language_code)
+    lang = await detect_language(user_id, query, m.from_user.language_code)
     await genesis6_report(user_id, query or m.text or "", lang)
     if not query:
         await DIVE_WAITING.set(user_id, datetime.now(timezone.utc).isoformat())
@@ -763,7 +724,7 @@ async def command_imagine(m: types.Message):
     """Generate an image from text description."""
     user_id = str(m.from_user.id)
     prompt = m.text[8:].strip() if m.text else ""
-    lang = await get_user_language(user_id, prompt, m.from_user.language_code)
+    lang = await detect_language(user_id, prompt, m.from_user.language_code)
     profile = await genesis6_report(user_id, prompt or m.text or "", lang)
     if not prompt:
         await m.answer("☝🏻 ❓")
@@ -785,7 +746,7 @@ async def command_vision(m: types.Message):
     """Analyze an image via URL."""
     user_id = str(m.from_user.id)
     url = m.text[7:].strip() if m.text else ""
-    lang = await get_user_language(user_id, url, m.from_user.language_code)
+    lang = await detect_language(user_id, url, m.from_user.language_code)
     if not url:
         await m.answer("☝🏻 ❓")
         return
@@ -816,7 +777,7 @@ async def enable_rawthinking(m: types.Message):
     user_id = str(m.from_user.id)
     await RAW_THINKING_USERS.set(user_id, datetime.now(timezone.utc).isoformat())
     await CODER_USERS.delete(user_id)
-    lang = await get_user_language(user_id, m.text or "", m.from_user.language_code)
+    lang = await detect_language(user_id, m.text or "", m.from_user.language_code)
     await m.answer("☝🏻 RAW ON")
     asyncio.create_task(genesis6_report(user_id, m.text or "", lang))
 
@@ -826,7 +787,7 @@ async def disable_rawthinking(m: types.Message):
     """Disable raw thinking mode for the user."""
     user_id = str(m.from_user.id)
     await RAW_THINKING_USERS.delete(user_id)
-    lang = await get_user_language(user_id, m.text or "", m.from_user.language_code)
+    lang = await detect_language(user_id, m.text or "", m.from_user.language_code)
     await m.answer("☝🏻 NO RAW")
     asyncio.create_task(genesis6_report(user_id, m.text or "", lang))
 
@@ -838,7 +799,7 @@ async def enable_coder(m: types.Message):
     if await RAW_THINKING_USERS.get(user_id):
         return
     await CODER_USERS.set(user_id, datetime.now(timezone.utc).isoformat())
-    lang = await get_user_language(user_id, m.text or "", m.from_user.language_code)
+    lang = await detect_language(user_id, m.text or "", m.from_user.language_code)
     await genesis6_report(user_id, m.text or "", lang)
     await m.answer("☝🏻 coder mode enabled")
 
@@ -848,7 +809,7 @@ async def disable_coder(m: types.Message):
     """Disable coder mode for the user."""
     user_id = str(m.from_user.id)
     await CODER_USERS.delete(user_id)
-    lang = await get_user_language(user_id, m.text or "", m.from_user.language_code)
+    lang = await detect_language(user_id, m.text or "", m.from_user.language_code)
     await genesis6_report(user_id, m.text or "", lang)
     await m.answer("☝🏻 coder mode disabled")
 
@@ -859,7 +820,7 @@ async def handle_document(m: types.Message):
     user_id = str(m.from_user.id)
     chat_id = m.chat.id
     safe_name = sanitize_filename(m.document.file_name)
-    lang = await get_user_language(user_id, m.caption or "", m.from_user.language_code)
+    lang = await detect_language(user_id, m.caption or "", m.from_user.language_code)
     profile = await genesis6_report(user_id, m.caption or safe_name, lang)
     try:
         if m.document.file_size and m.document.file_size > MAX_FILE_SIZE:
@@ -928,7 +889,7 @@ async def handle_message(m: types.Message):
             await m.answer(output)
             return
 
-        lang = await get_user_language(user_id, text, m.from_user.language_code)
+        lang = await detect_language(user_id, text, m.from_user.language_code)
         profile = await genesis6_report(user_id, text, lang)
 
         # Handle incoming photos via vision utility
