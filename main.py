@@ -2,6 +2,7 @@ import json
 import asyncio
 import random
 import logging
+import os
 import re
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -75,6 +76,9 @@ ARTIFACTS_DIR = Path("artefacts")
 NOTES_FILE = Path("notes/journal.json")
 VOICE_DIR = Path("voice_messages")
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
+ARTIFACT_MAX_FILE_SIZE = int(
+    os.getenv("ARTIFACT_MAX_FILE_SIZE", 1 * 1024 * 1024)
+)  # 1 MB
 
 bot = Bot(token=TELEGRAM_TOKEN)
 dp = Dispatcher()
@@ -181,9 +185,15 @@ async def genesis6_report(user_id: str, message: str, lang: str) -> dict:
 class ArtifactCache:
     """Lazy-loading cache for artefact files with size limit."""
 
-    def __init__(self, directory: Path, max_items: int = 10) -> None:
+    def __init__(
+        self,
+        directory: Path,
+        max_items: int = 10,
+        max_file_size: int = ARTIFACT_MAX_FILE_SIZE,
+    ) -> None:
         self.directory = directory
         self.max_items = max_items
+        self.max_file_size = max_file_size
         self.cache: OrderedDict[str, str] = OrderedDict()
 
     def get(self, name: str) -> str:
@@ -193,6 +203,17 @@ class ArtifactCache:
         if name in self.cache:
             self.cache.move_to_end(name)
             return self.cache[name]
+        size = path.stat().st_size
+        if size > self.max_file_size:
+            logger.warning(
+                "Artifact %s exceeds max size (%d > %d)",
+                name,
+                size,
+                self.max_file_size,
+            )
+            with path.open("r", encoding="utf-8", errors="ignore") as f:
+                text = f.read(self.max_file_size)
+            return text + "\n...[truncated]"
         text = path.read_text()
         self.cache[name] = text
         if len(self.cache) > self.max_items:
