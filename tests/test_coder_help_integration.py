@@ -58,11 +58,6 @@ async def test_coder_help_returns_core_commands(monkeypatch):
     monkeypatch.setattr(main, "memory", SimpleNamespace(save=fake_memory_save))
     monkeypatch.setattr(main, "save_note", lambda *a, **k: None)
     monkeypatch.setattr(main, "format_core_commands", lambda: "core help")
-
-    async def fake_is_rate_limited(*a, **k):
-        return False
-
-    monkeypatch.setattr(main, "is_rate_limited", fake_is_rate_limited)
     monkeypatch.setattr(main, "send_split_message", fake_send_split_message)
     monkeypatch.setattr(random, "random", lambda: 1.0)
 

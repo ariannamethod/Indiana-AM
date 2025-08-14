@@ -131,20 +131,7 @@ GENESIS1_SCHEDULE_FILE = Path("notes/genesis1_times.json")
 MESSAGE_DELAY = 0.5
 
 MESSAGE_CACHE_MAXLEN = 1000
-USER_MESSAGE_TIMES = LRUCache(maxlen=MESSAGE_CACHE_MAXLEN)
-RATE_LIMIT = 5
-RATE_PERIOD = timedelta(minutes=1)
-
-
-async def is_rate_limited(user_id: str, now: datetime | None = None) -> bool:
-    """Return True if the user has sent too many messages recently."""
-
-    now = now or datetime.now(timezone.utc)
-    timestamps = await USER_MESSAGE_TIMES.get(user_id, [])
-    timestamps = [ts for ts in timestamps if now - ts < RATE_PERIOD]
-    timestamps.append(now)
-    await USER_MESSAGE_TIMES.set(user_id, timestamps)
-    return len(timestamps) > RATE_LIMIT
+USER_MESSAGE_HISTORY = LRUCache(maxlen=MESSAGE_CACHE_MAXLEN)
 
 complexity_logger = ThoughtComplexityLogger()
 
@@ -186,7 +173,10 @@ async def get_user_language(
 
 async def genesis6_report(user_id: str, message: str, lang: str) -> dict:
     """Generate emotional profile for the message using Genesis-6."""
-    timestamps = await USER_MESSAGE_TIMES.get(user_id, [])
+    now = datetime.now(timezone.utc)
+    timestamps = await USER_MESSAGE_HISTORY.get(user_id, [])
+    timestamps.append(now)
+    await USER_MESSAGE_HISTORY.set(user_id, timestamps)
     avg_pause = 0.0
     if len(timestamps) > 1:
         deltas = [
@@ -942,13 +932,6 @@ async def handle_message(m: types.Message):
             return
 
         lang = await get_user_language(user_id, text, m.from_user.language_code)
-        if await is_rate_limited(user_id):
-            await genesis6_report(user_id, text, lang)
-            await m.answer(
-                "☝🏻 ⚠️ Вы отправляете сообщения слишком часто. Подождите минуту и попробуйте снова."
-            )
-            return
-
         profile = await genesis6_report(user_id, text, lang)
 
         # Handle incoming photos via vision utility

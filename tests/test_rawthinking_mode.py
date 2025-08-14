@@ -82,11 +82,6 @@ async def test_rawthinking_chain(monkeypatch):
     monkeypatch.setattr(main, "save_note", lambda *a, **k: None)
     monkeypatch.setattr(main, "process_with_assistant", fake_process_with_assistant)
     monkeypatch.setattr(main, "send_split_message", fake_send_split_message)
-
-    async def fake_is_rate_limited(*a, **k):
-        return False
-
-    monkeypatch.setattr(main, "is_rate_limited", fake_is_rate_limited)
     monkeypatch.setattr(asyncio, "sleep", fake_sleep)
 
     class DummyChatActionSender:
