@@ -31,6 +31,14 @@ class LRUCache:
         if len(self._data) > self.maxlen:
             self._data.popitem(last=False)
 
+    def delete(self, key: str) -> None:
+        """Remove ``key`` from the cache if present."""
+        self._data.pop(key, None)
+
+    def clear(self) -> None:
+        """Remove all items from the cache."""
+        self._data.clear()
+
     def cleanup(self, max_age: float) -> None:
         cutoff = time.time() - max_age
         keys = [k for k, (_, ts) in self._data.items() if ts < cutoff]

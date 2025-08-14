@@ -2,6 +2,7 @@ import sys
 from pathlib import Path
 from types import SimpleNamespace
 import random
+from datetime import datetime, timezone
 
 import pytest
 
@@ -35,7 +36,7 @@ class DummySender:
 async def test_coder_help_returns_core_commands(monkeypatch):
     main.CODER_USERS.clear()
     m = DummyMessage("/help")
-    main.CODER_USERS.add(str(m.from_user.id))
+    main.CODER_USERS.set(str(m.from_user.id), datetime.now(timezone.utc).isoformat())
 
     monkeypatch.setattr(main, "ChatActionSender", lambda **kwargs: DummySender())
 
@@ -70,9 +71,9 @@ async def test_coder_help_returns_core_commands(monkeypatch):
 @pytest.mark.asyncio
 async def test_coder_ignored_during_rawthinking():
     main.CODER_USERS.clear()
-    main.RAW_THINKING_USERS.add("123")
+    main.RAW_THINKING_USERS.set("123", datetime.now(timezone.utc).isoformat())
     m = DummyMessage("/coder")
     await main.enable_coder(m)
     assert m.answers == []
-    assert "123" not in main.CODER_USERS
+    assert main.CODER_USERS.get("123") is None
     main.RAW_THINKING_USERS.clear()

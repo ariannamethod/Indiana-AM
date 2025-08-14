@@ -3,6 +3,7 @@ import sys
 from pathlib import Path
 from types import SimpleNamespace
 import asyncio
+from datetime import datetime, timezone
 
 import pytest
 
@@ -30,7 +31,7 @@ class DummyMessage:
 
 @pytest.mark.asyncio
 async def test_rawthinking_chain(monkeypatch):
-    main.RAW_THINKING_USERS.add("123")
+    main.RAW_THINKING_USERS.set("123", datetime.now(timezone.utc).isoformat())
     main.EMERGENCY_MODE = False
     m = DummyMessage("What is life?")
     
