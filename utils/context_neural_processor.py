@@ -475,21 +475,31 @@ class FileHandler:
         async with self._semaphore:
             try:
                 with open(path, encoding="utf-8") as f:
-                    text = f.read()
-                esn.update(text, chaos_pulse.get())
-                return self._truncate(text) if text.strip() else "[TXT empty]"
+                    text = f.read(self.max_text_size + 1)
             except UnicodeDecodeError:
                 try:
                     with open(path, encoding="latin1") as f:
-                        text = f.read()
-                    esn.update(text, chaos_pulse.get())
-                    return self._truncate(text) if text.strip() else "[TXT empty]"
+                        text = f.read(self.max_text_size + 1)
                 except OSError as e:
-                    log_event(f"TXT error ({os.path.basename(path)}): {str(e)}", "error")
+                    log_event(
+                        f"TXT error ({os.path.basename(path)}): {str(e)}",
+                        "error",
+                    )
                     return f"[TXT error: {str(e)}]"
             except OSError as e:
-                log_event(f"TXT error ({os.path.basename(path)}): {str(e)}", "error")
+                log_event(
+                    f"TXT error ({os.path.basename(path)}): {str(e)}",
+                    "error",
+                )
                 return f"[TXT error: {str(e)}]"
+
+            truncated = len(text) > self.max_text_size
+            text = text[: self.max_text_size]
+            esn.update(text, chaos_pulse.get())
+            text = text.strip()
+            if not text:
+                return "[TXT empty]"
+            return text + ("\n[Truncated]" if truncated else "")
 
     async def _extract_docx(self, path: str) -> str:
         async with self._semaphore:
