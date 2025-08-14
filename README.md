@@ -517,7 +517,7 @@ Requires **Python 3.11+**.
 ```bash
 git clone https://github.com/ariannamethod/Indiana-AM.git
 cd Indiana-AM
-cp .env.example .env   # add TELEGRAM_TOKEN, OPENAI_API_KEY, PPLX_API_KEY, etc.
+cp .env.example .env   # add TELEGRAM_TOKEN, OPENAI_API_KEY, PPLX_API_KEY, VECTOR_STORE_PATH, etc.
 # also set AGENT_GROUP_ID, GROUP_CHAT, CREATOR_CHAT, PINECONE_API_KEY and EMBED_MODEL
 # `.env` auto-loads on startup
 # After first run, assistant IDs are stored in `assistants.json`

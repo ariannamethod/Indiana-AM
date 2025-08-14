@@ -93,7 +93,15 @@ client = AsyncOpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 ASSISTANT_ID = None
 
 # Vector store and memory manager
-vector_store = create_vector_store(max_size=settings.VECTOR_STORE_MAX_SIZE)
+VECTOR_STORE_PATH = Path(settings.VECTOR_STORE_PATH)
+if VECTOR_STORE_PATH.exists():
+    logger.info("Loading vector store from %s", VECTOR_STORE_PATH)
+else:
+    logger.info("Vector store file %s not found; starting new", VECTOR_STORE_PATH)
+vector_store = create_vector_store(
+    max_size=settings.VECTOR_STORE_MAX_SIZE,
+    persist_path=str(VECTOR_STORE_PATH),
+)
 memory = MemoryManager(db_path="lighthouse_memory.db", vectorstore=vector_store)
 
 
