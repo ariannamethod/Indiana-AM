@@ -228,6 +228,18 @@ After aggregation, it computes Markov entropy and model perplexity, offering bot
 
 When the accumulated data crosses the threshold, the symphony prepares a character dataset and summons the trainer to refresh weights.
 
+#### GENESIS Pipeline
+
+```mermaid
+graph TD
+    A[Artefacts + Repository] --> B[collect_new_data]
+    B --> C[prepare_char_dataset]
+    C --> D[train_model]
+    B --> E[markov_entropy & model_perplexity]
+    D --> F[state.json]
+    E --> F
+```
+
 `genesis_trainer.py` houses the GPT class and wrappers that distil nanoGPT's architecture into a lightweight research variant.
 
 Its blocks, attention heads, and token embeddings echo Karpathy's minimalism while exposing hyperparameters for small-scale experiments.
@@ -252,9 +264,39 @@ The orchestrator crossfeeds outputs from `utils/context_neural_processor.py`, le
 
 Together these utilities form a regenerative feedback loop where nanoGPT-derived networks and custom entropy metrics help Indiana evolve in place.
 
+## Standard Reply Flow
+
+```mermaid
+graph TD
+    U[User Message] --> P[GENESIS-6 Profile]
+    P --> C[Retrieve memory & artefacts]
+    C --> A[process_with_assistant]
+    A --> T[GENESIS-2 Intuition Filter]
+    A -->|complexity high| D[GENESIS-3 Deep Dive]
+    T --> S[Assemble Reply]
+    D --> S
+    S --> M[Save to memory & notes]
+    S --> R[Final Indiana reply]
+```
+
 ## Rawthinking Mode
 
 The Rawthinking mode unfolds after the Genesis pipeline, when Indiana turns from solitary reasoning to a polyphonic debate.
+
+```mermaid
+graph TD
+    U[User prompt] --> R[run_rawthinking]
+    R --> B[Indiana-B (Grok-3)]
+    R --> C[Indiana-C (Claude-4)]
+    R --> D[Indiana-D (DeepSeek)]
+    R --> G[Indiana-G (Gemini)]
+    B --> S[synthesize_final]
+    C --> S
+    D --> S
+    G --> S
+    S --> T[assemble_final_reply (GENESIS-2)]
+    T --> F[Final Indiana reply]
+```
 
 At its core stands the `run_rawthinking` utility in `utils/rawthinking.py`, the dispatcher that governs this debate.
 
