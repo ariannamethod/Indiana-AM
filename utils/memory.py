@@ -26,6 +26,16 @@ class MemoryManager:
         self._lock = asyncio.Lock()
         self.max_records_per_user = max_records_per_user
 
+    async def __aenter__(self):
+        """Ensure the database connection is ready when entering context."""
+        await self.connect()
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        """Close the database connection when leaving context."""
+        await self.close()
+        return False
+
     async def connect(self) -> aiosqlite.Connection:
         """Create a single shared connection if it doesn't exist."""
         if self._db is None:

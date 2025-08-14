@@ -92,8 +92,19 @@ client = AsyncOpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 # Will be filled at startup
 ASSISTANT_ID = None
 
+# Vector store and memory manager
 vector_store = create_vector_store(max_size=settings.VECTOR_STORE_MAX_SIZE)
 memory = MemoryManager(db_path="lighthouse_memory.db", vectorstore=vector_store)
+
+
+async def memory_lifespan(app):
+    """Manage memory connection for the web application lifecycle."""
+    async with memory:
+        await knowtheworld.memory.connect()
+        try:
+            yield
+        finally:
+            await knowtheworld.memory.close()
 # Lower the likelihood of spontaneous additions
 AFTERTHOUGHT_CHANCE = 0.02
 FOLLOWUP_CHANCE = 0.05
@@ -1125,8 +1136,6 @@ async def handle_message(m: types.Message):
 async def on_startup(app):
     """Setup webhook on startup."""
     await setup_assistant()
-    await memory.connect()
-    await knowtheworld.memory.connect()
     await dayandnight.init_vector_memory()
     await start_background_tasks()
     repo_watcher.start()
@@ -1169,12 +1178,6 @@ async def on_shutdown(app):
         logger.info("Repo watcher stopped")
     except Exception as e:
         logger.error(f"Error stopping repo watcher: {e}")
-    try:
-        await memory.close()
-        await knowtheworld.memory.close()
-        logger.info("Memory connections closed")
-    except Exception as e:
-        logger.error(f"Error closing memory: {e}")
 
 # --- Main function with webhook support ---
 async def main():
@@ -1190,6 +1193,7 @@ async def main():
     # Setup startup/shutdown handlers
     app.on_startup.append(on_startup)
     app.on_shutdown.append(on_shutdown)
+    app.cleanup_ctx.append(memory_lifespan)
 
     # Add healthcheck endpoint
     async def health_check(request):
@@ -1207,27 +1211,26 @@ if __name__ == "__main__":
     else:
         # Polling mode (for local development)
         async def start_polling():
-            await setup_assistant()
-            await memory.connect()
-            await knowtheworld.memory.connect()
-            await dayandnight.init_vector_memory()
-            await start_background_tasks()
-            repo_watcher.start()
-            await setup_bot_commands()
+            async with memory:
+                await setup_assistant()
+                await knowtheworld.memory.connect()
+                await dayandnight.init_vector_memory()
+                await start_background_tasks()
+                repo_watcher.start()
+                await setup_bot_commands()
 
-            # Perform initial GENESIS training and record entropy
-            update_and_train()
-            global LAST_MARKOV_ENTROPY
-            LAST_MARKOV_ENTROPY = report_entropy()
-            # Remove webhook and drop pending updates to avoid polling conflicts
-            await bot.delete_webhook(drop_pending_updates=True)
-            # Flush any previous getUpdates session
-            try:
-                await bot.get_updates(offset=-1)
-            except Exception:
-                pass
-            await dp.start_polling(bot)
-            await memory.close()
-            await knowtheworld.memory.close()
+                # Perform initial GENESIS training and record entropy
+                update_and_train()
+                global LAST_MARKOV_ENTROPY
+                LAST_MARKOV_ENTROPY = report_entropy()
+                # Remove webhook and drop pending updates to avoid polling conflicts
+                await bot.delete_webhook(drop_pending_updates=True)
+                # Flush any previous getUpdates session
+                try:
+                    await bot.get_updates(offset=-1)
+                except Exception:
+                    pass
+                await dp.start_polling(bot)
+                await knowtheworld.memory.close()
 
         asyncio.run(start_polling())

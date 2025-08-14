@@ -31,6 +31,8 @@ async def test_rate_limiter_stops_responses(monkeypatch):
         assert not is_rate_limited(user_id)
 
     m = DummyMessage()
+    import main
+    main.EMERGENCY_MODE = False
 
     async def fake_send_split_message(*args, **kwargs):  # pragma: no cover
         raise AssertionError("send_split_message should not be called")
