@@ -3,7 +3,7 @@ import os
 import sys
 from pathlib import Path
 
-from utils.security import is_blocked, log_blocked
+from utils.security import log_blocked, validate_command
 
 
 class AriannaTerminal:
@@ -63,8 +63,9 @@ class AriannaTerminal:
 
     async def run(self, cmd: str) -> str:
         real_cmd = cmd[5:] if cmd.startswith("/run ") else cmd
-        if is_blocked(real_cmd):
-            log_blocked(real_cmd)
+        allowed, reason = validate_command(real_cmd)
+        if not allowed:
+            log_blocked(real_cmd, reason)
             return "Терминал закрыт"
         await self._ensure_started()
         if not self.proc or not self.proc.stdin or not self.proc.stdout:
