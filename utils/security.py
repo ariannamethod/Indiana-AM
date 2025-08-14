@@ -1,4 +1,6 @@
+import json
 import logging
+import os
 import re
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
@@ -16,8 +18,7 @@ if not logger.handlers:
     logger.addHandler(handler)
     logger.setLevel(logging.INFO)
 
-# Whitelist of allowed commands
-ALLOWED_PATTERNS = [
+DEFAULT_ALLOWED_PATTERNS = [
     r"^echo\b",
     r"^ls\b",
     r"^cat\b",
@@ -25,10 +26,8 @@ ALLOWED_PATTERNS = [
     r"^whoami\b",
     r"^date\b",
 ]
-ALLOWED_REGEXES = [re.compile(p, re.IGNORECASE) for p in ALLOWED_PATTERNS]
 
-# Suspicious sequences to warn about
-SUSPICIOUS_PATTERNS = [
+DEFAULT_SUSPICIOUS_PATTERNS = [
     r"rm\s+-rf\s+/",
     r"sudo\s",
     r":\(\)\s*{\s*:\|:&\s*};\s*:",
@@ -47,7 +46,48 @@ SUSPICIOUS_PATTERNS = [
     r"xmrig",
     r"minerd",
 ]
-SUSPICIOUS_REGEXES = [re.compile(p, re.IGNORECASE) for p in SUSPICIOUS_PATTERNS]
+
+ALLOWED_PATTERNS = DEFAULT_ALLOWED_PATTERNS
+SUSPICIOUS_PATTERNS = DEFAULT_SUSPICIOUS_PATTERNS
+
+
+def _compile_patterns() -> None:
+    """Compile regex patterns after any modification."""
+
+    global ALLOWED_REGEXES, SUSPICIOUS_REGEXES
+    ALLOWED_REGEXES = [re.compile(p, re.IGNORECASE) for p in ALLOWED_PATTERNS]
+    SUSPICIOUS_REGEXES = [re.compile(p, re.IGNORECASE) for p in SUSPICIOUS_PATTERNS]
+
+
+_compile_patterns()
+
+
+def load_config(path: str | os.PathLike[str] | None) -> None:
+    """Load security patterns from JSON config file."""
+
+    if not path:
+        return
+    cfg_path = Path(path)
+    if not cfg_path.is_file():
+        return
+    try:
+        data = json.loads(cfg_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return
+
+    allowed = data.get("allowed")
+    suspicious = data.get("suspicious")
+    if isinstance(allowed, list) and allowed:
+        global ALLOWED_PATTERNS
+        ALLOWED_PATTERNS = allowed
+    if isinstance(suspicious, list) and suspicious:
+        global SUSPICIOUS_PATTERNS
+        SUSPICIOUS_PATTERNS = suspicious
+    _compile_patterns()
+
+
+# Load external configuration if provided
+load_config(os.getenv("SECURITY_CONFIG_PATH"))
 
 
 def is_blocked(command: str) -> bool:
@@ -69,4 +109,4 @@ def log_blocked(command: str) -> None:
     logger.error("Blocked command: %s", command)
 
 
-__all__ = ["is_blocked", "log_blocked"]
+__all__ = ["is_blocked", "log_blocked", "load_config"]
