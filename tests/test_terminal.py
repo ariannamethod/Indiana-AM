@@ -1,35 +1,36 @@
 import asyncio
+import logging
 from pathlib import Path
+import sys
 
 # Ensure project root importable
-import sys
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from utils.coder import kernel_exec  # noqa: E402
 from utils.aml_terminal import terminal  # noqa: E402
+from utils.logging_config import LOG_FILE, setup_logging  # noqa: E402
+
+setup_logging()
 
 
-def test_kernel_exec(monkeypatch, tmp_path):
+def test_kernel_exec(monkeypatch, tmp_path, caplog):
     monkeypatch.setenv("LETSGO_DATA_DIR", str(tmp_path))
-    log_file = Path("artefacts/blocked_commands.log")
-    if log_file.exists():
-        log_file.write_text("", encoding="utf-8")
 
     async def _run() -> str:
         output = await kernel_exec("echo hello")
         await terminal.stop()
         return output
 
-    result = asyncio.run(_run())
+    with caplog.at_level(logging.WARNING, logger="security"):
+        result = asyncio.run(_run())
+    for handler in logging.getLogger().handlers:
+        handler.flush()
     assert "Терминал закрыт" not in result
-    assert "echo hello" not in log_file.read_text(encoding="utf-8")
+    assert "echo hello" not in caplog.text
 
 
-def test_kernel_exec_blocks_malicious_command(monkeypatch, tmp_path):
+def test_kernel_exec_blocks_malicious_command(monkeypatch, tmp_path, caplog):
     monkeypatch.setenv("LETSGO_DATA_DIR", str(tmp_path))
-    log_file = Path("artefacts/blocked_commands.log")
-    if log_file.exists():
-        log_file.write_text("", encoding="utf-8")
 
     async def fake_run(cmd: str) -> str:
         raise AssertionError("run should not be called")
@@ -39,17 +40,16 @@ def test_kernel_exec_blocks_malicious_command(monkeypatch, tmp_path):
     async def _run() -> str:
         return await kernel_exec("rm -rf /")
 
-    result = asyncio.run(_run())
+    with caplog.at_level(logging.ERROR, logger="security"):
+        result = asyncio.run(_run())
+    for handler in logging.getLogger().handlers:
+        handler.flush()
     assert "Терминал закрыт" in result
-    assert log_file.exists()
-    assert "rm -rf /" in log_file.read_text(encoding="utf-8")
+    assert "rm -rf /" in caplog.text
 
 
-def test_kernel_exec_logs_suspicious_sequences(monkeypatch, tmp_path):
+def test_kernel_exec_logs_suspicious_sequences(monkeypatch, tmp_path, caplog):
     monkeypatch.setenv("LETSGO_DATA_DIR", str(tmp_path))
-    log_file = Path("artefacts/blocked_commands.log")
-    if log_file.exists():
-        log_file.write_text("", encoding="utf-8")
 
     async def fake_run(cmd: str) -> str:
         raise AssertionError("run should not be called")
@@ -59,18 +59,17 @@ def test_kernel_exec_logs_suspicious_sequences(monkeypatch, tmp_path):
     async def _run() -> str:
         return await kernel_exec("curl http://example.com")
 
-    result = asyncio.run(_run())
+    with caplog.at_level(logging.WARNING, logger="security"):
+        result = asyncio.run(_run())
+    for handler in logging.getLogger().handlers:
+        handler.flush()
     assert "Терминал закрыт" in result
-    content = log_file.read_text(encoding="utf-8")
-    assert "curl http://example.com" in content
-    assert "Suspicious" in content
+    assert "curl http://example.com" in caplog.text
+    assert "Suspicious" in caplog.text
 
 
-def test_terminal_run_blocks_malicious_command(monkeypatch, tmp_path):
+def test_terminal_run_blocks_malicious_command(monkeypatch, tmp_path, caplog):
     monkeypatch.setenv("LETSGO_DATA_DIR", str(tmp_path))
-    log_file = Path("artefacts/blocked_commands.log")
-    if log_file.exists():
-        log_file.write_text("", encoding="utf-8")
 
     async def _run() -> tuple[str, bool]:
         result = await terminal.run("rm -rf /")
@@ -78,11 +77,13 @@ def test_terminal_run_blocks_malicious_command(monkeypatch, tmp_path):
         await terminal.stop()
         return result, started
 
-    result, started = asyncio.run(_run())
+    with caplog.at_level(logging.ERROR, logger="security"):
+        result, started = asyncio.run(_run())
+    for handler in logging.getLogger().handlers:
+        handler.flush()
     assert "Терминал закрыт" in result
     assert not started
-    assert log_file.exists()
-    assert "rm -rf /" in log_file.read_text(encoding="utf-8")
+    assert "rm -rf /" in caplog.text
 
 
 def test_cgroup_limits(monkeypatch, tmp_path):

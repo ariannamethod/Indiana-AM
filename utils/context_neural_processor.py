@@ -14,7 +14,6 @@ from pathlib import Path
 import random
 import re
 import json
-from datetime import datetime
 import logging
 
 from .archive import safe_extract
@@ -88,27 +87,15 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 DEFAULT_MAX_TEXT_SIZE = 100_000
 DEFAULT_MAX_ARCHIVE_SIZE = 10_000_000  # 10 MB
 REPO_SNAPSHOT_PATH = BASE_DIR / "config/repo_snapshot.md"
-LOG_DIR = BASE_DIR / "logs/context_neural_processor"
-FAIL_DIR = BASE_DIR / "logs/failures"
 CACHE_DB = BASE_DIR / "cache/context_neural_cache.db"
-LOG_DIR.mkdir(parents=True, exist_ok=True)
-FAIL_DIR.mkdir(parents=True, exist_ok=True)
 CACHE_DB.parent.mkdir(parents=True, exist_ok=True)
 
 
 def log_event(msg: str, log_type: str = "info") -> None:
-    """Write ``msg`` to the context neural processor log and failures log if needed."""
+    """Log ``msg`` using the standard logging configuration."""
 
-    entry = {
-        "timestamp": datetime.utcnow().isoformat(),
-        "type": log_type,
-        "msg": msg,
-    }
-    with (LOG_DIR / f"{datetime.utcnow().date()}.jsonl").open("a", encoding="utf-8") as f:
-        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
-    if log_type == "error":
-        with (FAIL_DIR / f"{datetime.utcnow().date()}.jsonl").open("a", encoding="utf-8") as f:
-            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    level = getattr(logger, log_type, logger.info)
+    level(msg)
 
 
 def apply_pulse(weights: List[float], pulse: float) -> List[float]:

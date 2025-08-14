@@ -25,14 +25,7 @@ from letsgo import CORE_COMMANDS  # type: ignore  # noqa: E402
 api_key = os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=api_key) if api_key else None
 
-LOG_FILE = Path(__file__).resolve().parent.parent / "artefacts" / "coder.log"
 logger = logging.getLogger("coder")
-if not logger.handlers:
-    handler = logging.FileHandler(LOG_FILE)
-    formatter = logging.Formatter("%(asctime)s %(levelname)s: %(message)s")
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
-logger.setLevel(logging.INFO)
 
 # Root directory of the repository for path validation
 REPO_ROOT = Path(__file__).resolve().parent.parent

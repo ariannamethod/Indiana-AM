@@ -33,6 +33,7 @@ from utils.complexity import (
     ThoughtComplexityLogger,
     estimate_complexity_and_entropy,
 )
+from utils.logging_config import setup_logging
 from langdetect import detect, DetectorFactory, LangDetectException
 from utils.repo_monitor import RepoWatcher
 from utils.voice import text_to_voice, voice_to_text
@@ -46,11 +47,7 @@ from indiana_d import techno_indiana_chat
 from indiana_g import gravity_indiana_chat
 from GENESIS_orchestrator import update_and_train, report_entropy
 
-# Настройка логгера
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
+setup_logging()
 logger = logging.getLogger(__name__)
 
 load_dotenv()
