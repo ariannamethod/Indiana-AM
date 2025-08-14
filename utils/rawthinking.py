@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from pathlib import Path
 
 from openai import AsyncOpenAI
 
@@ -17,9 +16,6 @@ from GENESIS_orchestrator.entropy import markov_entropy, model_perplexity
 logger = logging.getLogger(__name__)
 
 client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY) if settings.OPENAI_API_KEY else None
-
-LOG_FILE = Path("/arianna_core/log/rawthinking.log")
-
 
 async def synthesize_final(
     prompt: str,
@@ -87,24 +83,17 @@ async def synthesize_final(
     except Exception as e:
         logger.error("Perplexity calc failed: %s", e)
 
-    try:
-        LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
-        with LOG_FILE.open("a", encoding="utf-8") as f:
-            f.write(
-                "Q: {q}\nB: {b}\nC: {c}\nD: {d}\nG: {g}\nFinal: {f}\n"
-                "Entropy: {e:.2f} | Perplexity: {p:.2f}\n---\n".format(
-                    q=prompt,
-                    b=b_resp or "—",
-                    c=c_resp or "—",
-                    d=d_resp or "—",
-                    g=g_resp or "—",
-                    f=final_reply,
-                    e=entropy,
-                    p=perplexity,
-                )
-            )
-    except Exception as e:
-        logger.error("Failed to log rawthinking: %s", e)
+    logger.info(
+        "Q: %s\nB: %s\nC: %s\nD: %s\nG: %s\nFinal: %s\nEntropy: %.2f | Perplexity: %.2f\n---",
+        prompt,
+        b_resp or "—",
+        c_resp or "—",
+        d_resp or "—",
+        g_resp or "—",
+        final_reply,
+        entropy,
+        perplexity,
+    )
 
     return final_reply
 

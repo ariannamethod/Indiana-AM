@@ -1,6 +1,7 @@
 import asyncio
 import sys
 import time
+import logging
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -13,6 +14,9 @@ from utils.coder import (  # noqa: E402
     format_core_commands,
     CORE_COMMANDS,
 )
+from utils.logging_config import setup_logging  # noqa: E402
+
+setup_logging()
 
 
 def test_analyze_denies_outside_repo(tmp_path):
@@ -75,12 +79,7 @@ def test_ask_retries_and_succeeds(monkeypatch):
     assert calls["n"] == 2
 
 
-def test_ask_logs_failures(monkeypatch):
-    from utils import coder as coder_module
-
-    log_file = coder_module.LOG_FILE
-    log_file.write_text("")
-
+def test_ask_logs_failures(monkeypatch, caplog):
     def create(**_: object) -> None:  # pragma: no cover - behavior mocked
         time.sleep(0.2)
 
@@ -93,8 +92,7 @@ def test_ask_logs_failures(monkeypatch):
     monkeypatch.setattr(asyncio, "sleep", no_sleep)
 
     coder = IndianaCoder(timeout=0.01)
-    result = asyncio.run(coder._ask("hi"))
-    for handler in coder_module.logger.handlers:
-        handler.flush()
+    with caplog.at_level(logging.WARNING, logger="coder"):
+        result = asyncio.run(coder._ask("hi"))
     assert "Code interpreter error" in result
-    assert "Attempt" in log_file.read_text()
+    assert "Attempt" in caplog.text

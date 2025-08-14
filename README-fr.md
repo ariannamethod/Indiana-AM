@@ -278,7 +278,7 @@ La synthèse passe par `genesis2_sonar_filter`, de sorte que la réponse finale 
 
 L’entropie de Markov et la perplexité d’un micro‑GPT sont calculées, traitant la conversation comme un champ stochastique dont on mesure la surprise.
 
-Chaque échange est consigné dans `/arianna_core/log/rawthinking.log`, fournissant une trace d’audit de chaque consilium.
+Chaque échange est consigné dans `logs/indiana.log` avec rotation hebdomadaire et compression gzip, fournissant une trace d’audit de chaque consilium.
 
 Rawthinking ne remplace pas le mode thinking existant ; il surgit seulement quand on l’appelle par la commande `/rawthinking`.
 

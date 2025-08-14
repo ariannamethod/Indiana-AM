@@ -278,7 +278,7 @@ The synthesis passes through `genesis2_sonar_filter`, so the final answer carrie
 
 Markov entropy and micro‑GPT perplexity are computed, treating the conversation as a stochastic field whose surprise can be quantified.
 
-All exchanges are logged to `/arianna_core/log/rawthinking.log`, providing an audit trail of every consilium.
+All exchanges are logged to `logs/indiana.log` with weekly rotation and gzip compression, providing an audit trail of every consilium.
 
 Rawthinking does not replace the existing thinking mode; it emerges only when explicitly summoned with `/rawthinking`.
 

@@ -2,28 +2,11 @@ import logging
 import re
 import shlex
 from collections.abc import Callable
-from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 
 LOG_FILE = Path("artefacts/blocked_commands.log")
-LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
 
 logger = logging.getLogger("security")
-
-
-def _configure_logger() -> None:
-    if logger.handlers:
-        return
-    handler = TimedRotatingFileHandler(
-        LOG_FILE, when="midnight", backupCount=7, encoding="utf-8"
-    )
-    formatter = logging.Formatter("%(asctime)s %(levelname)s: %(message)s")
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
-    logger.setLevel(logging.INFO)
-
-
-_configure_logger()
 
 # Whitelist of allowed commands and their permitted arguments
 # ``None`` means any arguments are allowed, an empty set means no arguments.
@@ -121,7 +104,6 @@ def validate_command(command: str) -> tuple[bool, str | None]:
 def log_blocked(command: str, reason: str) -> None:
     """Log a blocked command attempt with the reason."""
 
-    _configure_logger()
     logger.error("Blocked command: %s - %s", command, reason)
     for handler in logger.handlers:
         handler.flush()
