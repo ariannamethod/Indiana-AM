@@ -902,6 +902,10 @@ async def handle_message(m: types.Message):
             voice_path = VOICE_DIR / f"{file_info.file_unique_id}.ogg"
             await bot.download_file(file_info.file_path, destination=voice_path)
             text = await voice_to_text(client, voice_path)
+            try:
+                voice_path.unlink()
+            except Exception as e:
+                logger.error(f"Failed to delete voice file {voice_path}: {e}")
 
         user_id = str(m.from_user.id)
         chat_id = m.chat.id
