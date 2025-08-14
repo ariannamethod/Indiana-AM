@@ -34,6 +34,7 @@ from utils.complexity import (
     estimate_complexity_and_entropy,
 )
 from utils.logging_config import setup_logging
+from utils.keyboards import control_keyboard
 from langdetect import detect, DetectorFactory, LangDetectException
 from utils.repo_monitor import RepoWatcher
 from utils.voice import text_to_voice, voice_to_text
@@ -122,6 +123,14 @@ VOICE_USERS = LRUCache(maxlen=LANG_CACHE_MAXLEN, ttl=USER_STATE_TTL)
 DIVE_WAITING = LRUCache(maxlen=LANG_CACHE_MAXLEN, ttl=USER_STATE_TTL)
 CODER_USERS = LRUCache(maxlen=LANG_CACHE_MAXLEN, ttl=USER_STATE_TTL)
 RAW_THINKING_USERS = LRUCache(maxlen=LANG_CACHE_MAXLEN, ttl=USER_STATE_TTL)
+
+async def user_settings_keyboard(user_id: str) -> types.InlineKeyboardMarkup:
+    """Return control keyboard reflecting current user and global modes."""
+    voice = bool(await VOICE_USERS.get(user_id))
+    coder = bool(await CODER_USERS.get(user_id))
+    deep = FORCE_DEEP_DIVE
+    return control_keyboard(voice, deep, coder)
+
 
 GENESIS1_SCHEDULE_FILE = Path("notes/genesis1_times.json")
 
@@ -687,6 +696,14 @@ async def toggle_emergency_mode(m: types.Message):
     status = "activated" if EMERGENCY_MODE else "deactivated"
     await m.answer(f"☝🏻 emergency mode {status}")
 
+
+@dp.message(F.text == "/settings")
+async def show_settings(m: types.Message):
+    """Display current mode settings with inline keyboard."""
+    user_id = str(m.from_user.id)
+    kb = await user_settings_keyboard(user_id)
+    await m.answer("☝🏻 mode panel", reply_markup=kb)
+
 # --- Deep Dive Toggle Commands ---
 @dp.message(F.text == "/deep")
 async def enable_deep_mode(m: types.Message):
@@ -704,10 +721,12 @@ async def enable_deep_mode(m: types.Message):
         ]
         base = random.choice(templates)
         reply = await genesis2_sonar_filter(m.text or "", base, lang)
-        await m.answer(reply)
+        kb = await user_settings_keyboard(user_id)
+        await m.answer(reply, reply_markup=kb)
         return
     FORCE_DEEP_DIVE = True
-    await m.answer("☝🏻 deep mode enabled")
+    kb = await user_settings_keyboard(user_id)
+    await m.answer("☝🏻 deep mode enabled", reply_markup=kb)
 
 
 @dp.message(F.text == "/deepoff")
@@ -718,7 +737,8 @@ async def disable_deep_mode(m: types.Message):
     user_id = str(m.from_user.id)
     lang = await get_user_language(user_id, m.text or "", m.from_user.language_code)
     await genesis6_report(user_id, m.text or "", lang)
-    await m.answer("☝🏻 deep mode disabled")
+    kb = await user_settings_keyboard(user_id)
+    await m.answer("☝🏻 deep mode disabled", reply_markup=kb)
 
 
 @dp.message(F.text.in_({"/voiceon", "/voice"}))
@@ -728,7 +748,8 @@ async def enable_voice(m: types.Message):
     await VOICE_USERS.set(user_id, datetime.now(timezone.utc).isoformat())
     lang = await get_user_language(user_id, m.text or "", m.from_user.language_code)
     await genesis6_report(user_id, m.text or "", lang)
-    await m.answer("☝🏻 voice mode enabled")
+    kb = await user_settings_keyboard(user_id)
+    await m.answer("☝🏻 voice mode enabled", reply_markup=kb)
 
 
 @dp.message(F.text == "/voiceoff")
@@ -738,7 +759,8 @@ async def disable_voice(m: types.Message):
     await VOICE_USERS.delete(user_id)
     lang = await get_user_language(user_id, m.text or "", m.from_user.language_code)
     await genesis6_report(user_id, m.text or "", lang)
-    await m.answer("☝🏻 voice mode disabled")
+    kb = await user_settings_keyboard(user_id)
+    await m.answer("☝🏻 voice mode disabled", reply_markup=kb)
 
 
 # --- Utility Commands ---
@@ -840,7 +862,8 @@ async def enable_coder(m: types.Message):
     await CODER_USERS.set(user_id, datetime.now(timezone.utc).isoformat())
     lang = await get_user_language(user_id, m.text or "", m.from_user.language_code)
     await genesis6_report(user_id, m.text or "", lang)
-    await m.answer("☝🏻 coder mode enabled")
+    kb = await user_settings_keyboard(user_id)
+    await m.answer("☝🏻 coder mode enabled", reply_markup=kb)
 
 
 @dp.message(F.text == "/coderoff")
@@ -850,7 +873,53 @@ async def disable_coder(m: types.Message):
     await CODER_USERS.delete(user_id)
     lang = await get_user_language(user_id, m.text or "", m.from_user.language_code)
     await genesis6_report(user_id, m.text or "", lang)
-    await m.answer("☝🏻 coder mode disabled")
+    kb = await user_settings_keyboard(user_id)
+    await m.answer("☝🏻 coder mode disabled", reply_markup=kb)
+
+
+@dp.callback_query(F.data == "voice_toggle")
+async def voice_toggle_cb(c: types.CallbackQuery):
+    user_id = str(c.from_user.id)
+    if await VOICE_USERS.get(user_id):
+        await VOICE_USERS.delete(user_id)
+        text = "☝🏻 voice mode disabled"
+    else:
+        await VOICE_USERS.set(user_id, datetime.now(timezone.utc).isoformat())
+        text = "☝🏻 voice mode enabled"
+    kb = await user_settings_keyboard(user_id)
+    await c.message.edit_text(text, reply_markup=kb)
+    await c.answer()
+
+
+@dp.callback_query(F.data == "deep_toggle")
+async def deep_toggle_cb(c: types.CallbackQuery):
+    global FORCE_DEEP_DIVE
+    user_id = str(c.from_user.id)
+    if not FORCE_DEEP_DIVE and await RAW_THINKING_USERS.get(user_id):
+        await c.answer("RAW mode blocks DEEP", show_alert=True)
+        return
+    FORCE_DEEP_DIVE = not FORCE_DEEP_DIVE
+    text = "☝🏻 deep mode enabled" if FORCE_DEEP_DIVE else "☝🏻 deep mode disabled"
+    kb = await user_settings_keyboard(user_id)
+    await c.message.edit_text(text, reply_markup=kb)
+    await c.answer()
+
+
+@dp.callback_query(F.data == "coder_toggle")
+async def coder_toggle_cb(c: types.CallbackQuery):
+    user_id = str(c.from_user.id)
+    if await CODER_USERS.get(user_id):
+        await CODER_USERS.delete(user_id)
+        text = "☝🏻 coder mode disabled"
+    else:
+        if await RAW_THINKING_USERS.get(user_id):
+            await c.answer("RAW mode blocks CODER", show_alert=True)
+            return
+        await CODER_USERS.set(user_id, datetime.now(timezone.utc).isoformat())
+        text = "☝🏻 coder mode enabled"
+    kb = await user_settings_keyboard(user_id)
+    await c.message.edit_text(text, reply_markup=kb)
+    await c.answer()
 
 # --- Document Handler ---
 @dp.message(F.document)
