@@ -112,10 +112,11 @@ DetectorFactory.seed = 0
 LANG_CACHE_MAXLEN = 1000
 LANG_CACHE_TTL = 30 * 24 * 60 * 60  # 30 days
 USER_LANGS = LRUCache(maxlen=LANG_CACHE_MAXLEN)
-VOICE_USERS: set[str] = set()
-DIVE_WAITING: set[str] = set()
-CODER_USERS: set[str] = set()
-RAW_THINKING_USERS: set[str] = set()
+USER_STATE_TTL = 60 * 60  # 1 hour
+VOICE_USERS = LRUCache(maxlen=LANG_CACHE_MAXLEN, ttl=USER_STATE_TTL)
+DIVE_WAITING = LRUCache(maxlen=LANG_CACHE_MAXLEN, ttl=USER_STATE_TTL)
+CODER_USERS = LRUCache(maxlen=LANG_CACHE_MAXLEN, ttl=USER_STATE_TTL)
+RAW_THINKING_USERS = LRUCache(maxlen=LANG_CACHE_MAXLEN, ttl=USER_STATE_TTL)
 
 GENESIS1_SCHEDULE_FILE = Path("notes/genesis1_times.json")
 
@@ -258,6 +259,7 @@ async def start_background_tasks() -> None:
         task_group.create_task(genesis1_daily_task()),
         task_group.create_task(cleanup_old_voice_files()),
         task_group.create_task(cleanup_user_langs()),
+        task_group.create_task(cleanup_user_states()),
     ]
     background_tasks.extend(tasks)
 
@@ -284,6 +286,19 @@ async def cleanup_user_langs():
         except Exception as e:
             logger.error(f"Lang cache cleanup error: {e}")
         await asyncio.sleep(3600)
+
+
+async def cleanup_user_states():
+    """Periodically remove expired user state records."""
+    while True:
+        try:
+            VOICE_USERS.cleanup(USER_STATE_TTL)
+            DIVE_WAITING.cleanup(USER_STATE_TTL)
+            CODER_USERS.cleanup(USER_STATE_TTL)
+            RAW_THINKING_USERS.cleanup(USER_STATE_TTL)
+        except Exception as e:
+            logger.error(f"User state cleanup error: {e}")
+        await asyncio.sleep(USER_STATE_TTL)
 
 
 async def genesis1_daily_task():
@@ -344,7 +359,7 @@ async def run_deep_dive(chat_id: int, user_id: str, query: str, lang: str) -> No
             "query": query,
             "response": reply,
         })
-        if user_id in VOICE_USERS and client:
+        if VOICE_USERS.get(user_id) and client:
             try:
                 audio = await text_to_voice(client, reply)
                 voice_file = types.BufferedInputFile(audio, filename="reply.ogg")
@@ -672,7 +687,7 @@ async def enable_deep_mode(m: types.Message):
     user_id = str(m.from_user.id)
     lang = get_user_language(user_id, m.text or "", m.from_user.language_code)
     await genesis6_report(user_id, m.text or "", lang)
-    if user_id in RAW_THINKING_USERS:
+    if RAW_THINKING_USERS.get(user_id):
         templates = [
             "DEEP is incompatible with RAW; choose one path.",
             "RAW mode blocks DEEP—spirit and concept clash.",
@@ -702,7 +717,7 @@ async def disable_deep_mode(m: types.Message):
 async def enable_voice(m: types.Message):
     """Enable voice responses for the user."""
     user_id = str(m.from_user.id)
-    VOICE_USERS.add(user_id)
+    VOICE_USERS.set(user_id, datetime.now(timezone.utc).isoformat())
     lang = get_user_language(user_id, m.text or "", m.from_user.language_code)
     await genesis6_report(user_id, m.text or "", lang)
     await m.answer("☝🏻 voice mode enabled")
@@ -712,7 +727,7 @@ async def enable_voice(m: types.Message):
 async def disable_voice(m: types.Message):
     """Disable voice responses for the user."""
     user_id = str(m.from_user.id)
-    VOICE_USERS.discard(user_id)
+    VOICE_USERS.delete(user_id)
     lang = get_user_language(user_id, m.text or "", m.from_user.language_code)
     await genesis6_report(user_id, m.text or "", lang)
     await m.answer("☝🏻 voice mode disabled")
@@ -729,7 +744,7 @@ async def command_dive(m: types.Message):
     lang = get_user_language(user_id, query, m.from_user.language_code)
     await genesis6_report(user_id, query or m.text or "", lang)
     if not query:
-        DIVE_WAITING.add(user_id)
+        DIVE_WAITING.set(user_id, datetime.now(timezone.utc).isoformat())
         await m.answer("☝🏻 ❓")
         return
     await run_deep_dive(m.chat.id, user_id, query, lang)
@@ -775,7 +790,7 @@ async def command_vision(m: types.Message):
     reply = f"{description}\n\n🜂 Investigative Twist → {twist}"
     await memory.save(user_id, f"vision: {url}", reply)
     save_note({"time": datetime.now(timezone.utc).isoformat(), "user": user_id, "query": url, "response": reply})
-    if user_id in VOICE_USERS and client:
+    if VOICE_USERS.get(user_id) and client:
         try:
             audio_bytes = await text_to_voice(client, reply)
             voice_file = types.BufferedInputFile(audio_bytes, filename="reply.ogg")
@@ -789,8 +804,8 @@ async def command_vision(m: types.Message):
 async def enable_rawthinking(m: types.Message):
     """Enable raw thinking mode for the user."""
     user_id = str(m.from_user.id)
-    RAW_THINKING_USERS.add(user_id)
-    CODER_USERS.discard(user_id)
+    RAW_THINKING_USERS.set(user_id, datetime.now(timezone.utc).isoformat())
+    CODER_USERS.delete(user_id)
     lang = get_user_language(user_id, m.text or "", m.from_user.language_code)
     await m.answer("☝🏻 RAW ON")
     asyncio.create_task(genesis6_report(user_id, m.text or "", lang))
@@ -800,7 +815,7 @@ async def enable_rawthinking(m: types.Message):
 async def disable_rawthinking(m: types.Message):
     """Disable raw thinking mode for the user."""
     user_id = str(m.from_user.id)
-    RAW_THINKING_USERS.discard(user_id)
+    RAW_THINKING_USERS.delete(user_id)
     lang = get_user_language(user_id, m.text or "", m.from_user.language_code)
     await m.answer("☝🏻 NO RAW")
     asyncio.create_task(genesis6_report(user_id, m.text or "", lang))
@@ -810,9 +825,9 @@ async def disable_rawthinking(m: types.Message):
 async def enable_coder(m: types.Message):
     """Enable coder mode for the user."""
     user_id = str(m.from_user.id)
-    if user_id in RAW_THINKING_USERS:
+    if RAW_THINKING_USERS.get(user_id):
         return
-    CODER_USERS.add(user_id)
+    CODER_USERS.set(user_id, datetime.now(timezone.utc).isoformat())
     lang = get_user_language(user_id, m.text or "", m.from_user.language_code)
     await genesis6_report(user_id, m.text or "", lang)
     await m.answer("☝🏻 coder mode enabled")
@@ -822,7 +837,7 @@ async def enable_coder(m: types.Message):
 async def disable_coder(m: types.Message):
     """Disable coder mode for the user."""
     user_id = str(m.from_user.id)
-    CODER_USERS.discard(user_id)
+    CODER_USERS.delete(user_id)
     lang = get_user_language(user_id, m.text or "", m.from_user.language_code)
     await genesis6_report(user_id, m.text or "", lang)
     await m.answer("☝🏻 coder mode disabled")
@@ -862,7 +877,7 @@ async def handle_document(m: types.Message):
                 "response": reply,
             }
         )
-        if user_id in VOICE_USERS and client:
+        if VOICE_USERS.get(user_id) and client:
             try:
                 audio_bytes = await text_to_voice(client, reply)
                 voice_file = types.BufferedInputFile(audio_bytes, filename="reply.ogg")
@@ -920,7 +935,7 @@ async def handle_message(m: types.Message):
             reply = f"{description}\n\n🜂 Investigative Twist → {twist}"
             await memory.save(user_id, f"photo: {image_url}", reply)
             save_note({"time": datetime.now(timezone.utc).isoformat(), "user": user_id, "query": image_url, "response": reply})
-            if user_id in VOICE_USERS and client:
+            if VOICE_USERS.get(user_id) and client:
                 try:
                     audio_bytes = await text_to_voice(client, reply)
                     voice_file = types.BufferedInputFile(audio_bytes, filename="reply.ogg")
@@ -931,13 +946,13 @@ async def handle_message(m: types.Message):
             return
 
         # Handle pending deep dive requests
-        if user_id in DIVE_WAITING:
-            DIVE_WAITING.discard(user_id)
+        if DIVE_WAITING.get(user_id):
+            DIVE_WAITING.delete(user_id)
             await run_deep_dive(chat_id, user_id, text, lang)
             return
 
         # Handle raw thinking mode
-        if user_id in RAW_THINKING_USERS and not text.startswith("/"):
+        if RAW_THINKING_USERS.get(user_id) and not text.startswith("/"):
             b_task = asyncio.create_task(badass_indiana_chat(text, lang))
             c_task = asyncio.create_task(light_indiana_chat(text, lang))
             d_task = asyncio.create_task(techno_indiana_chat(text, lang))
@@ -1041,7 +1056,7 @@ async def handle_message(m: types.Message):
             return
 
         # Handle coder mode
-        if user_id in CODER_USERS:
+        if CODER_USERS.get(user_id):
             async with ChatActionSender(bot=bot, chat_id=chat_id, action="typing"):
                 if text.strip() == "/help":
                     result = format_core_commands()
@@ -1053,7 +1068,7 @@ async def handle_message(m: types.Message):
             reply = f"{result}\n\n🜂 Investigative Twist → {twist}"
             await memory.save(user_id, text, reply)
             save_note({"time": datetime.now(timezone.utc).isoformat(), "user": user_id, "query": text, "response": reply})
-            if user_id in VOICE_USERS and client:
+            if VOICE_USERS.get(user_id) and client:
                 try:
                     audio_bytes = await text_to_voice(client, reply)
                     voice_file = types.BufferedInputFile(audio_bytes, filename="reply.ogg")
@@ -1110,7 +1125,7 @@ async def handle_message(m: types.Message):
         save_note({"time": datetime.now(timezone.utc).isoformat(), "user": user_id, "query": text, "response": reply})
 
         # 4) Send response
-        if user_id in VOICE_USERS and client:
+        if VOICE_USERS.get(user_id) and client:
             try:
                 audio_bytes = await text_to_voice(client, reply)
                 voice_file = types.BufferedInputFile(audio_bytes, filename="reply.ogg")
