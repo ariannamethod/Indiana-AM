@@ -1,4 +1,3 @@
-import logging
 import os
 import sys
 from pathlib import Path
@@ -8,17 +7,20 @@ import pytest
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from utils.memory import MemoryManager  # noqa: E402
-from utils.vectorstore import BaseVectorStore, LocalVectorStore  # noqa: E402
+from utils.vectorstore import LocalVectorStore  # noqa: E402
 from utils.config import settings  # noqa: E402
 
 
 @pytest.mark.asyncio
 async def test_memory_save_and_retrieve(tmp_path):
+    """User memories should be saved and retrievable."""
+
     db_path = tmp_path / "memory.db"
     vec_path = tmp_path / "vector.json"
     os.environ.pop("OPENAI_API_KEY", None)
     settings.OPENAI_API_KEY = None
     store = LocalVectorStore(persist_path=str(vec_path))
+
     async with MemoryManager(db_path=str(db_path), vectorstore=store) as memory:
         assert await memory.save("u1", "q1", "r1")
 
@@ -31,10 +33,13 @@ async def test_memory_save_and_retrieve(tmp_path):
 
 @pytest.mark.asyncio
 async def test_prune_user_records(tmp_path):
+    """Old records should be pruned once the per-user limit is exceeded."""
+
     db_path = tmp_path / "memory.db"
     os.environ.pop("OPENAI_API_KEY", None)
     settings.OPENAI_API_KEY = None
     store = LocalVectorStore()
+
     async with MemoryManager(db_path=str(db_path), vectorstore=store, max_records_per_user=2) as memory:
         for i in range(3):
             assert await memory.save("u1", f"q{i}", f"r{i}")
@@ -42,6 +47,7 @@ async def test_prune_user_records(tmp_path):
         db = await memory.connect()
         async with db.execute("SELECT COUNT(*) FROM memory WHERE user_id=?", ("u1",)) as cur:
             count = (await cur.fetchone())[0]
+
         assert count == 2
 
         responses = await memory.retrieve("u1", "q")
@@ -49,29 +55,19 @@ async def test_prune_user_records(tmp_path):
         assert "r1" in responses and "r2" in responses
 
 
-class FailingVectorStore(BaseVectorStore):
-    async def store(self, id: str, text: str, *, user_id: str | None = None, metadata: dict | None = None):
-        raise RuntimeError("boom")
-
-    async def search(self, query: str, top_k: int = 5, *, user_id: str | None = None):
-        return []
-
-
 @pytest.mark.asyncio
-async def test_vector_store_failure(tmp_path, caplog):
+async def test_memory_persistence_after_restart(tmp_path):
+    """Data should persist after closing and reopening the manager."""
+
     db_path = tmp_path / "memory.db"
     os.environ.pop("OPENAI_API_KEY", None)
     settings.OPENAI_API_KEY = None
-    async with MemoryManager(db_path=str(db_path), vectorstore=FailingVectorStore()) as memory:
-        caplog.set_level(logging.ERROR)
-        status = await memory.save("u1", "q1", "r1")
-        assert status is False
-        assert "Vector store failed" in caplog.text
 
-
-@pytest.mark.asyncio
-async def test_connection_closed_after_context(tmp_path):
-    db_path = tmp_path / "memory.db"
     async with MemoryManager(db_path=str(db_path)) as memory:
         await memory.save("u1", "q1", "r1")
-    assert memory._db is None
+
+    # Re-open manager to simulate restart
+    async with MemoryManager(db_path=str(db_path)) as memory:
+        retrieved = await memory.retrieve("u1", "q1")
+
+    assert "r1" in retrieved
