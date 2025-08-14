@@ -11,6 +11,8 @@ logger = logging.getLogger(__name__)
 
 # how many records to keep per user
 DEFAULT_MAX_RECORDS = 100
+# run VACUUM after this many deleted rows
+VACUUM_DELETIONS_THRESHOLD = 100
 
 
 class MemoryManager:
@@ -25,6 +27,7 @@ class MemoryManager:
         self._db: Optional[aiosqlite.Connection] = None
         self._lock = asyncio.Lock()
         self.max_records_per_user = max_records_per_user
+        self._deletes_since_vacuum = 0
 
     async def __aenter__(self):
         """Ensure the database connection is ready when entering context."""
@@ -72,9 +75,20 @@ class MemoryManager:
         )
         await db.commit()
 
+    async def vacuum(self) -> None:
+        """Run SQLite VACUUM to reclaim space after deletions."""
+        db = await self.connect()
+        await db.commit()
+        await db.execute("VACUUM")
+
     async def _prune_user_records(self, db: aiosqlite.Connection, user_id: str) -> None:
-        """Remove old records keeping only the most recent N per user."""
-        await db.execute(
+        """Remove old records and occasionally compact the database.
+
+        Old records beyond ``max_records_per_user`` are deleted, and the
+        database is VACUUMed every ``VACUUM_DELETIONS_THRESHOLD`` deleted rows
+        to reclaim disk space after heavy pruning.
+        """
+        cur = await db.execute(
             """
             DELETE FROM memory
             WHERE rowid IN (
@@ -86,6 +100,13 @@ class MemoryManager:
             """,
             (user_id, self.max_records_per_user),
         )
+
+        deleted = cur.rowcount
+        if deleted > 0:
+            self._deletes_since_vacuum += deleted
+            if self._deletes_since_vacuum >= VACUUM_DELETIONS_THRESHOLD:
+                await self.vacuum()
+                self._deletes_since_vacuum = 0
 
     async def save(self, user_id: str, query: str, response: str) -> bool:
         """Save user query and response to memory database and vector store."""
