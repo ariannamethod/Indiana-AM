@@ -70,10 +70,22 @@ def split_message(text: str, max_length: int = 4000):
 
     return parts
 
-async def send_split_message(bot, chat_id, text, parse_mode=None, **kwargs):
+async def send_split_message(
+    bot,
+    chat_id,
+    text,
+    parse_mode=None,
+    delay: float = 0.5,
+    **kwargs,
+):
     """
     Отправляет сообщение в Telegram с корректным разбиением длинных сообщений.
     Добавляет индикаторы продолжения и возвращает все отправленные сообщения.
+
+    Parameters
+    ----------
+    delay: float
+        Задержка между отправкой частей сообщения в секундах.
     """
     # Логирование длины сообщения для отладки
     logger.info(f"Sending message with length: {len(text)} characters")
@@ -104,7 +116,7 @@ async def send_split_message(bot, chat_id, text, parse_mode=None, **kwargs):
 
             # Небольшая задержка между сообщениями для лучшего восприятия
             if i < len(parts) - 1:
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(delay)
         except Exception as e:
             logger.error(f"Error sending message part {i+1}/{len(parts)}: {str(e)}")
             # Попытаемся отправить сообщение об ошибке

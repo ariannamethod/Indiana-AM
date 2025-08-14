@@ -120,6 +120,8 @@ RAW_THINKING_USERS = LRUCache(maxlen=LANG_CACHE_MAXLEN, ttl=USER_STATE_TTL)
 
 GENESIS1_SCHEDULE_FILE = Path("notes/genesis1_times.json")
 
+MESSAGE_DELAY = 0.5
+
 MESSAGE_CACHE_MAXLEN = 1000
 USER_MESSAGE_TIMES = LRUCache(maxlen=MESSAGE_CACHE_MAXLEN)
 RATE_LIMIT = 5
@@ -329,7 +331,9 @@ async def genesis1_daily_task():
             try:
                 twist = await genesis2_sonar_filter(digest, digest, "en")
                 msg = f"☝🏻 {digest}\n\n🜂 Investigative Twist → {twist}"
-                await send_split_message(bot, chat_id=AGENT_GROUP, text=msg)
+                await send_split_message(
+                    bot, chat_id=AGENT_GROUP, text=msg, delay=MESSAGE_DELAY
+                )
             except Exception as e:
                 logger.error(f"Genesis1 send failed: {e}")
 
@@ -366,10 +370,17 @@ async def run_deep_dive(chat_id: int, user_id: str, query: str, lang: str) -> No
                 await bot.send_voice(chat_id, voice_file)
             except Exception as e:
                 logger.error(f"Voice synthesis failed: {e}")
-        await send_split_message(bot, chat_id=chat_id, text=reply)
+        await send_split_message(
+            bot, chat_id=chat_id, text=reply, delay=MESSAGE_DELAY
+        )
     except Exception as e:
         logger.error(f"Perplexity search failed: {e}")
-        await send_split_message(bot, chat_id=chat_id, text=f"search error: {e}")
+        await send_split_message(
+            bot,
+            chat_id=chat_id,
+            text=f"search error: {e}",
+            delay=MESSAGE_DELAY,
+        )
 
 async def setup_bot_commands() -> None:
     """Configure bot commands for menu button."""
@@ -612,7 +623,7 @@ async def delayed_followup(chat_id: int, user_id: str, prev_reply: str, original
         save_note({"time": datetime.now(timezone.utc).isoformat(), "user": user_id, "followup": text})
 
         # Используем новую функцию send_split_message вместо разбиения и цикла
-        await send_split_message(bot, chat_id, text)
+        await send_split_message(bot, chat_id, text, delay=MESSAGE_DELAY)
     except Exception as e:
         logger.error(f"Error in delayed_followup: {e}")
 
@@ -666,7 +677,7 @@ async def afterthought(chat_id: int, user_id: str, original: str, private: bool)
         save_note(entry)
 
         # Используем новую функцию send_split_message
-        await send_split_message(bot, chat_id, text)
+        await send_split_message(bot, chat_id, text, delay=MESSAGE_DELAY)
     except Exception as e:
         logger.error(f"Error in afterthought: {e}")
 
@@ -797,7 +808,9 @@ async def command_vision(m: types.Message):
             await bot.send_voice(m.chat.id, voice_file)
         except Exception as e:
             logger.error(f"Voice synthesis failed: {e}")
-    await send_split_message(bot, chat_id=m.chat.id, text=reply)
+    await send_split_message(
+        bot, chat_id=m.chat.id, text=reply, delay=MESSAGE_DELAY
+    )
 
 
 @dp.message(F.text == "/rawthinking")
@@ -884,7 +897,9 @@ async def handle_document(m: types.Message):
                 await bot.send_voice(chat_id, voice_file)
             except Exception as e:
                 logger.error(f"Voice synthesis failed: {e}")
-        await send_split_message(bot, chat_id=chat_id, text=reply)
+        await send_split_message(
+            bot, chat_id=chat_id, text=reply, delay=MESSAGE_DELAY
+        )
     except Exception as e:
         logger.error(f"File processing failed: {e}")
         await m.answer(f"☝🏻 file error: {e}")
@@ -942,7 +957,9 @@ async def handle_message(m: types.Message):
                     await bot.send_voice(chat_id, voice_file)
                 except Exception as e:
                     logger.error(f"Voice synthesis failed: {e}")
-            await send_split_message(bot, chat_id=chat_id, text=reply)
+            await send_split_message(
+                bot, chat_id=chat_id, text=reply, delay=MESSAGE_DELAY
+            )
             return
 
         # Handle pending deep dive requests
@@ -996,7 +1013,10 @@ async def handle_message(m: types.Message):
                     logger.error("Indiana-B failed: %s", e)
             if b_resp:
                 await send_split_message(
-                    bot, chat_id=chat_id, text=f"Indiana-B\n{b_resp}"
+                    bot,
+                    chat_id=chat_id,
+                    text=f"Indiana-B\n{b_resp}",
+                    delay=MESSAGE_DELAY,
                 )
 
             async with ChatActionSender(bot=bot, chat_id=chat_id, action="typing"):
@@ -1012,7 +1032,10 @@ async def handle_message(m: types.Message):
                         logger.error("Indiana-C fallback failed: %s", e2)
             if c_resp:
                 await send_split_message(
-                    bot, chat_id=chat_id, text=f"Indiana-C\n{c_resp}"
+                    bot,
+                    chat_id=chat_id,
+                    text=f"Indiana-C\n{c_resp}",
+                    delay=MESSAGE_DELAY,
                 )
 
             async with ChatActionSender(bot=bot, chat_id=chat_id, action="typing"):
@@ -1024,7 +1047,10 @@ async def handle_message(m: types.Message):
                     logger.error("Indiana-D failed: %s", e)
             if d_resp:
                 await send_split_message(
-                    bot, chat_id=chat_id, text=f"Indiana-D\n{d_resp}"
+                    bot,
+                    chat_id=chat_id,
+                    text=f"Indiana-D\n{d_resp}",
+                    delay=MESSAGE_DELAY,
                 )
 
             async with ChatActionSender(bot=bot, chat_id=chat_id, action="typing"):
@@ -1036,13 +1062,18 @@ async def handle_message(m: types.Message):
                     logger.error("Indiana-G failed: %s", e)
             if g_resp:
                 await send_split_message(
-                    bot, chat_id=chat_id, text=f"Indiana-G\n{g_resp}"
+                    bot,
+                    chat_id=chat_id,
+                    text=f"Indiana-G\n{g_resp}",
+                    delay=MESSAGE_DELAY,
                 )
 
             async with ChatActionSender(bot=bot, chat_id=chat_id, action="typing"):
                 await asyncio.sleep(random.uniform(3, 8))
                 final = await synthesize_final(text, b_resp, c_resp, d_resp, g_resp, lang)
-            await send_split_message(bot, chat_id=chat_id, text=final)
+            await send_split_message(
+                bot, chat_id=chat_id, text=final, delay=MESSAGE_DELAY
+            )
 
             await memory.save(user_id, text, final)
             save_note(
@@ -1075,7 +1106,9 @@ async def handle_message(m: types.Message):
                     await bot.send_voice(chat_id, voice_file)
                 except Exception as e:
                     logger.error(f"Voice synthesis failed: {e}")
-            await send_split_message(bot, chat_id=chat_id, text=reply)
+            await send_split_message(
+                bot, chat_id=chat_id, text=reply, delay=MESSAGE_DELAY
+            )
             return
 
         # Filter out very short messages
@@ -1133,7 +1166,9 @@ async def handle_message(m: types.Message):
             except Exception as e:
                 logger.error(f"Voice synthesis failed: {e}")
 
-        await send_split_message(bot, chat_id=chat_id, text=reply)
+        await send_split_message(
+            bot, chat_id=chat_id, text=reply, delay=MESSAGE_DELAY
+        )
 
         # 5) Schedule follow-up
         if random.random() < FOLLOWUP_CHANCE:
