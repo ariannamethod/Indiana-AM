@@ -43,3 +43,25 @@ def test_split_message_word_split_overlong_sentence():
     assert all(len(p) <= 40 for p in parts)
     assert " ".join(parts) == text
     assert all(not p.startswith(" ") and not p.endswith(" ") for p in parts)
+
+
+def test_split_message_long_code_block_preserved():
+    code = "\n".join([f"print({i})" for i in range(50)])
+    text = f"```python\n{code}\n```"
+    parts = split_message(text, max_length=120, preserve_markdown=True)
+    assert len(parts) > 1
+    for part in parts:
+        assert part.startswith("```")
+        assert part.endswith("```")
+    reconstructed = "\n".join(
+        "\n".join(part.splitlines()[1:-1]) for part in parts
+    )
+    assert reconstructed.strip() == code.strip()
+
+
+def test_split_message_long_code_block_not_preserved():
+    code = "\n".join([f"print({i})" for i in range(50)])
+    text = f"```python\n{code}\n```"
+    parts = split_message(text, max_length=120, preserve_markdown=False)
+    assert len(parts) > 1
+    assert any(not p.startswith("```") or not p.endswith("```") for p in parts)
