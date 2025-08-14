@@ -1,5 +1,6 @@
 import logging
 import re
+import shlex
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 
@@ -16,16 +17,16 @@ if not logger.handlers:
     logger.addHandler(handler)
     logger.setLevel(logging.INFO)
 
-# Whitelist of allowed commands
-ALLOWED_PATTERNS = [
-    r"^echo\b",
-    r"^ls\b",
-    r"^cat\b",
-    r"^pwd\b",
-    r"^whoami\b",
-    r"^date\b",
-]
-ALLOWED_REGEXES = [re.compile(p, re.IGNORECASE) for p in ALLOWED_PATTERNS]
+# Whitelist of allowed commands and their permitted arguments
+# ``None`` means any arguments are allowed, an empty set means no arguments.
+ALLOWED_COMMANDS: dict[str, set[str] | None] = {
+    "echo": None,
+    "ls": {"-l", "-a", "-la", "-al"},
+    "cat": None,
+    "pwd": set(),
+    "whoami": set(),
+    "date": set(),
+}
 
 # Suspicious sequences to warn about
 SUSPICIOUS_PATTERNS = [
@@ -50,23 +51,43 @@ SUSPICIOUS_PATTERNS = [
 SUSPICIOUS_REGEXES = [re.compile(p, re.IGNORECASE) for p in SUSPICIOUS_PATTERNS]
 
 
-def is_blocked(command: str) -> bool:
-    """Return True if command is not in the whitelist.
+def validate_command(command: str) -> tuple[bool, str | None]:
+    """Validate a shell command against a whitelist.
 
-    Suspicious sequences are logged regardless of allow status.
+    Returns a tuple ``(allowed, reason)`` where ``allowed`` indicates whether the
+    command is permitted. ``reason`` contains the block reason when ``allowed`` is
+    ``False``.
     """
 
     if any(regex.search(command) for regex in SUSPICIOUS_REGEXES):
         logger.warning("Suspicious command sequence: %s", command)
 
-    allowed = any(regex.search(command) for regex in ALLOWED_REGEXES)
-    return not allowed
+    try:
+        parts = shlex.split(command)
+    except ValueError as exc:
+        return False, f"parse error: {exc}"
+
+    if not parts:
+        return False, "empty command"
+
+    cmd, *args = parts
+    if cmd not in ALLOWED_COMMANDS:
+        return False, f"command {cmd} not allowed"
+
+    allowed_args = ALLOWED_COMMANDS[cmd]
+    if allowed_args is None:
+        return True, None
+
+    if args and not all(arg in allowed_args for arg in args):
+        return False, f"arguments {args} not allowed for {cmd}"
+
+    return True, None
 
 
-def log_blocked(command: str) -> None:
-    """Log a blocked command attempt."""
+def log_blocked(command: str, reason: str) -> None:
+    """Log a blocked command attempt with the reason."""
 
-    logger.error("Blocked command: %s", command)
+    logger.error("Blocked command: %s - %s", command, reason)
 
 
-__all__ = ["is_blocked", "log_blocked"]
+__all__ = ["validate_command", "log_blocked"]
