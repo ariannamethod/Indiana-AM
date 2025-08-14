@@ -17,6 +17,8 @@ import json
 from datetime import datetime
 import logging
 
+from .archive import safe_extract
+
 try:  # Optional dependency
     from bs4 import BeautifulSoup
 except ImportError:  # pragma: no cover - optional
@@ -641,35 +643,51 @@ class FileHandler:
                 texts = []
                 total_size = 0
                 with zipfile.ZipFile(path) as zf:
-                    for info in zf.infolist():
-                        if total_size >= self.max_archive_size:
-                            break
-                        if info.is_dir():
-                            continue
-                        if (
-                            info.file_size > self.max_text_size
-                            or total_size + info.file_size > self.max_archive_size
-                        ):
-                            continue
+                    with tempfile.TemporaryDirectory() as tmpdir:
                         try:
-                            data = zf.read(info.filename)
-                            total_size += info.file_size
-                            ext = await self._detect_extension(info.filename)
-                            extractor = self._extractors.get(ext)
-                            if extractor and extractor not in {self._extract_zip, self._extract_tar}:
-                                with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
-                                    tmp.write(data)
-                                    tmp.flush()
-                                    text = await extractor(tmp.name)
-                                os.unlink(tmp.name)
-                            else:
+                            safe_extract(zf, tmpdir)
+                        except Exception as e:
+                            log_event(
+                                f"ZIP path traversal ({os.path.basename(path)}): {str(e)}",
+                                "error",
+                            )
+                            return f"[ZIP error: {str(e)}]"
+                        for root, _, files in os.walk(tmpdir):
+                            if total_size >= self.max_archive_size:
+                                break
+                            for name in files:
+                                file_path = os.path.join(root, name)
+                                size = os.path.getsize(file_path)
+                                if (
+                                    size > self.max_text_size
+                                    or total_size + size > self.max_archive_size
+                                ):
+                                    continue
                                 try:
-                                    text = data.decode("utf-8")
-                                except UnicodeDecodeError:
-                                    text = data.decode("latin1", "ignore")
-                            texts.append(text)
-                        except (OSError, zipfile.BadZipFile):
-                            continue
+                                    with open(file_path, "rb") as f:
+                                        data = f.read()
+                                    total_size += size
+                                    ext = await self._detect_extension(name)
+                                    extractor = self._extractors.get(ext)
+                                    if extractor and extractor not in {
+                                        self._extract_zip,
+                                        self._extract_tar,
+                                    }:
+                                        with tempfile.NamedTemporaryFile(
+                                            delete=False, suffix=ext
+                                        ) as tmp:
+                                            tmp.write(data)
+                                            tmp.flush()
+                                            text = await extractor(tmp.name)
+                                        os.unlink(tmp.name)
+                                    else:
+                                        try:
+                                            text = data.decode("utf-8")
+                                        except UnicodeDecodeError:
+                                            text = data.decode("latin1", "ignore")
+                                    texts.append(text)
+                                except OSError:
+                                    continue
                 combined = "\n".join(texts)
                 esn.update(combined, chaos_pulse.get())
                 return self._truncate(combined) if combined.strip() else "[ZIP empty]"
@@ -730,38 +748,51 @@ class FileHandler:
                 texts = []
                 total_size = 0
                 with tarfile.open(path, "r:*") as tf:
-                    for member in tf.getmembers():
-                        if total_size >= self.max_archive_size:
-                            break
-                        if member.isdir():
-                            continue
-                        if (
-                            member.size > self.max_text_size
-                            or total_size + member.size > self.max_archive_size
-                        ):
-                            continue
+                    with tempfile.TemporaryDirectory() as tmpdir:
                         try:
-                            file_obj = tf.extractfile(member)
-                            if not file_obj:
-                                continue
-                            data = file_obj.read()
-                            total_size += member.size
-                            ext = await self._detect_extension(member.name)
-                            extractor = self._extractors.get(ext)
-                            if extractor and extractor not in {self._extract_zip, self._extract_tar}:
-                                with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
-                                    tmp.write(data)
-                                    tmp.flush()
-                                    text = await extractor(tmp.name)
-                                os.unlink(tmp.name)
-                            else:
+                            safe_extract(tf, tmpdir)
+                        except Exception as e:
+                            log_event(
+                                f"TAR path traversal ({os.path.basename(path)}): {str(e)}",
+                                "error",
+                            )
+                            return f"[TAR error: {str(e)}]"
+                        for root, _, files in os.walk(tmpdir):
+                            if total_size >= self.max_archive_size:
+                                break
+                            for name in files:
+                                file_path = os.path.join(root, name)
+                                size = os.path.getsize(file_path)
+                                if (
+                                    size > self.max_text_size
+                                    or total_size + size > self.max_archive_size
+                                ):
+                                    continue
                                 try:
-                                    text = data.decode("utf-8")
-                                except UnicodeDecodeError:
-                                    text = data.decode("latin1", "ignore")
-                            texts.append(text)
-                        except (OSError, tarfile.TarError):
-                            continue
+                                    with open(file_path, "rb") as f:
+                                        data = f.read()
+                                    total_size += size
+                                    ext = await self._detect_extension(name)
+                                    extractor = self._extractors.get(ext)
+                                    if extractor and extractor not in {
+                                        self._extract_zip,
+                                        self._extract_tar,
+                                    }:
+                                        with tempfile.NamedTemporaryFile(
+                                            delete=False, suffix=ext
+                                        ) as tmp:
+                                            tmp.write(data)
+                                            tmp.flush()
+                                            text = await extractor(tmp.name)
+                                        os.unlink(tmp.name)
+                                    else:
+                                        try:
+                                            text = data.decode("utf-8")
+                                        except UnicodeDecodeError:
+                                            text = data.decode("latin1", "ignore")
+                                    texts.append(text)
+                                except OSError:
+                                    continue
                 combined = "\n".join(texts)
                 esn.update(combined, chaos_pulse.get())
                 return self._truncate(combined) if combined.strip() else "[TAR empty]"
