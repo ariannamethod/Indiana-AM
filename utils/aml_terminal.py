@@ -3,6 +3,8 @@ import os
 import sys
 from pathlib import Path
 
+from utils.security import is_blocked, log_blocked
+
 
 class AriannaTerminal:
     """Minimal bridge to the AM-Linux letsgo terminal."""
@@ -60,6 +62,10 @@ class AriannaTerminal:
             buf += chunk
 
     async def run(self, cmd: str) -> str:
+        real_cmd = cmd[5:] if cmd.startswith("/run ") else cmd
+        if is_blocked(real_cmd):
+            log_blocked(real_cmd)
+            return "Терминал закрыт"
         await self._ensure_started()
         if not self.proc or not self.proc.stdin or not self.proc.stdout:
             raise RuntimeError("process not started")
