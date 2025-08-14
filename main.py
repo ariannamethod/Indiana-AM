@@ -33,7 +33,7 @@ from utils.complexity import (
     ThoughtComplexityLogger,
     estimate_complexity_and_entropy,
 )
-from langdetect import detect, DetectorFactory
+from langdetect import detect, DetectorFactory, LangDetectException
 from utils.repo_monitor import RepoWatcher
 from utils.voice import text_to_voice, voice_to_text
 from utils.context_neural_processor import parse_and_store_file
@@ -151,7 +151,7 @@ def get_user_language(user_id: str, text: str, language_code: str | None = None)
     if len(clean) >= 3:
         try:
             lang = detect(text)
-        except Exception:
+        except LangDetectException:
             lang = None
     if language_code:
         language_code = language_code.split("-")[0]
