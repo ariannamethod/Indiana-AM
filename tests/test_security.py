@@ -47,8 +47,17 @@ def test_blocked_command_and_logging(temp_security_log, caplog):
 
     caplog.clear()
     caplog.set_level(logging.ERROR, logger="security")
-    security.log_blocked("rm -rf /")
+    security.log_blocked("rm -rf /", "manual reason")
     assert "Blocked command" in caplog.text
 
     # Ensure log file records the blocked command
-    assert "Blocked command" in temp_security_log.read_text(encoding="utf-8")
+    log_text = temp_security_log.read_text(encoding="utf-8")
+    assert "Blocked command" in log_text
+    assert "manual reason" in log_text
+
+
+def test_cat_path_validation():
+    safe_file = Path("AM-Linux-Core/README.md")
+    unsafe_file = Path(__file__).resolve()
+    assert security.is_blocked(f"cat {safe_file}") is False
+    assert security.is_blocked(f"cat {unsafe_file}") is True
