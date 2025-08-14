@@ -10,6 +10,7 @@
 import os
 import httpx
 import asyncio
+import logging
 
 # Badass Indiana Persona: 80% original, 20% cynical shadow-self
 INDIANA_BADASS_PERSONA = """
@@ -44,10 +45,15 @@ Style:
 """
 
 # Grok-3 API endpoint and headers
+logger = logging.getLogger(__name__)
+XAI_API_KEY = os.getenv("XAI_API_KEY")
+if not XAI_API_KEY:
+    logger.error("XAI_API_KEY environment variable not set.")
+
 GROK3_API_URL = "https://api.x.ai/v1/chat/completions"
 GROK3_HEADERS = {
-    "Authorization": f"Bearer {os.getenv('XAI_API_KEY')}",
-    "Content-Type": "application/json"
+    "Authorization": f"Bearer {XAI_API_KEY}" if XAI_API_KEY else "",
+    "Content-Type": "application/json",
 }
 
 async def badass_indiana_chat(prompt: str, lang: str = "en") -> str:
@@ -56,6 +62,10 @@ async def badass_indiana_chat(prompt: str, lang: str = "en") -> str:
     The response is always returned in the language specified by ``lang`` and is
     addressed to the main Indiana agent rather than directly to the user.
     """
+    if not XAI_API_KEY:
+        logger.error("Cannot query Grok-3 API: XAI_API_KEY is missing.")
+        return "XAI_API_KEY is missing"
+
     system_prompt = (
         f"{INDIANA_BADASS_PERSONA}\n"
         f"Respond only in {lang} and address your thoughts to the main Indiana."
@@ -72,8 +82,12 @@ async def badass_indiana_chat(prompt: str, lang: str = "en") -> str:
         ],
     }
     async with httpx.AsyncClient(timeout=60) as client:
-        resp = await client.post(GROK3_API_URL, headers=GROK3_HEADERS, json=payload)
-        resp.raise_for_status()
+        try:
+            resp = await client.post(GROK3_API_URL, headers=GROK3_HEADERS, json=payload)
+            resp.raise_for_status()
+        except httpx.HTTPError as exc:
+            logger.exception("Grok-3 API request failed: %s", exc)
+            return "Error: unable to reach Grok-3 API"
         data = resp.json()
         text = data["choices"][0]["message"]["content"].strip()
         if data["choices"][0].get("finish_reason") == "length" and not text.endswith((".", "!", "?")):
