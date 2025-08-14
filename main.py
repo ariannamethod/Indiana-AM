@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 
 from utils.memory import MemoryManager
 from utils.lru_cache import LRUCache
-from utils.tools import send_split_message, sanitize_filename
+from utils.tools import send_split_message, sanitize_filename, run_background
 from utils.vectorstore import create_vector_store
 from utils.config import settings
 from utils import dayandnight
@@ -808,7 +808,7 @@ async def enable_rawthinking(m: types.Message):
     CODER_USERS.delete(user_id)
     lang = get_user_language(user_id, m.text or "", m.from_user.language_code)
     await m.answer("☝🏻 RAW ON")
-    asyncio.create_task(genesis6_report(user_id, m.text or "", lang))
+    run_background(genesis6_report(user_id, m.text or "", lang))
 
 
 @dp.message(F.text == "/rawoff")
@@ -818,7 +818,7 @@ async def disable_rawthinking(m: types.Message):
     RAW_THINKING_USERS.delete(user_id)
     lang = get_user_language(user_id, m.text or "", m.from_user.language_code)
     await m.answer("☝🏻 NO RAW")
-    asyncio.create_task(genesis6_report(user_id, m.text or "", lang))
+    run_background(genesis6_report(user_id, m.text or "", lang))
 
 
 @dp.message(F.text == "/coder")
@@ -953,10 +953,10 @@ async def handle_message(m: types.Message):
 
         # Handle raw thinking mode
         if RAW_THINKING_USERS.get(user_id) and not text.startswith("/"):
-            b_task = asyncio.create_task(badass_indiana_chat(text, lang))
-            c_task = asyncio.create_task(light_indiana_chat(text, lang))
-            d_task = asyncio.create_task(techno_indiana_chat(text, lang))
-            g_task = asyncio.create_task(gravity_indiana_chat(text, lang))
+            b_task = run_background(badass_indiana_chat(text, lang))
+            c_task = run_background(light_indiana_chat(text, lang))
+            d_task = run_background(techno_indiana_chat(text, lang))
+            g_task = run_background(gravity_indiana_chat(text, lang))
 
             summary_prompt = (
                 f"Summarise the following question in one sentence: {text}"
@@ -1137,11 +1137,11 @@ async def handle_message(m: types.Message):
 
         # 5) Schedule follow-up
         if random.random() < FOLLOWUP_CHANCE:
-            asyncio.create_task(delayed_followup(chat_id, user_id, reply, text, private))
+            run_background(delayed_followup(chat_id, user_id, reply, text, private))
 
         # 6) Randomly schedule afterthought
         if random.random() < AFTERTHOUGHT_CHANCE:
-            asyncio.create_task(afterthought(chat_id, user_id, text, private))
+            run_background(afterthought(chat_id, user_id, text, private))
         await dayandnight.ensure_daily_entry()
     except Exception as e:
         logger.error(f"Error in handle_message: {e}")

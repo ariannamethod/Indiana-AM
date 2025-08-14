@@ -9,6 +9,21 @@ from GENESIS_orchestrator import status_emoji
 logger = logging.getLogger(__name__)
 
 
+def run_background(coro):
+    """Run ``coro`` in the background and log exceptions."""
+    task = asyncio.create_task(coro)
+
+    def _log_exception(t: asyncio.Task):
+        if t.cancelled():
+            return
+        exc = t.exception()
+        if exc:
+            logger.error("Background task failed", exc_info=exc)
+
+    task.add_done_callback(_log_exception)
+    return task
+
+
 def sanitize_filename(filename: str) -> str:
     """Return a safe filename without path components or suspicious characters."""
     safe_name = Path(filename).name

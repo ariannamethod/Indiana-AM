@@ -1,9 +1,13 @@
+import asyncio
 import sys
 from pathlib import Path
+from unittest.mock import MagicMock
+
+import pytest
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
-from utils.tools import split_message  # noqa: E402
+from utils.tools import split_message, run_background  # noqa: E402
 
 
 def test_split_message_short_text():
@@ -43,3 +47,19 @@ def test_split_message_word_split_overlong_sentence():
     assert all(len(p) <= 40 for p in parts)
     assert " ".join(parts) == text
     assert all(not p.startswith(" ") and not p.endswith(" ") for p in parts)
+
+
+@pytest.mark.asyncio
+async def test_run_background_logs_exception(monkeypatch):
+    mock_logger = MagicMock()
+    monkeypatch.setattr("utils.tools.logger", mock_logger)
+
+    async def boom():
+        raise ValueError("boom")
+
+    task = run_background(boom())
+
+    with pytest.raises(ValueError):
+        await task
+
+    assert mock_logger.error.call_count == 1
