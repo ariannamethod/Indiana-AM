@@ -281,8 +281,6 @@ graph TD
 
 ## Rawthinking Mode
 
-The Rawthinking mode unfolds after the Genesis pipeline, when Indiana turns from solitary reasoning to a polyphonic debate:
-
 ```mermaid
 graph TD
     U[User Message] --> R[run_rawthinking]
