@@ -283,13 +283,23 @@ graph TD
 
 The Rawthinking mode unfolds after the Genesis pipeline, when Indiana turns from solitary reasoning to a polyphonic debate:
 
-```mermaid
-graph TD
-    U[User Message] --> R[run_rawthinking]
-    R --> Q[Indiana B/C/D/G]
-    Q --> S[synthesize_final]
-    S --> T[assemble_final_reply (GENESIS-2)]
-    T --> F[Final Indiana reply]
+```
+User Message
+  |
+  v
+run_rawthinking
+  |
+  v
+Indiana B/C/D/G
+  |
+  v
+synthesize_final
+  |
+  v
+assemble_final_reply (GENESIS-2)
+  |
+  v
+Final Indiana reply
 ```
 
 At its core stands the `run_rawthinking` utility in `utils/rawthinking.py`, the dispatcher that governs this debate.
