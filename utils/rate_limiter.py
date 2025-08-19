@@ -2,7 +2,7 @@ import asyncio
 import logging
 import time
 from collections import deque
-from typing import Deque, Dict
+from typing import Deque, Dict, Set
 
 from aiogram import BaseMiddleware
 from aiogram.types import Message, TelegramObject
@@ -19,16 +19,28 @@ class RateLimitMiddleware(BaseMiddleware):
     depending on ``delay``.
     """
 
-    def __init__(self, limit: int, window: float, delay: float = 0.0, max_users: int = 1024) -> None:
+    def __init__(
+        self,
+        limit: int,
+        window: float,
+        delay: float = 0.0,
+        max_users: int = 1024,
+        *,
+        period: float = 86400,
+        bypass_ids: Set[str] | None = None,
+    ) -> None:
         self.limit = limit
         self.window = window
         self.delay = delay
-        self._users: LRUCache = LRUCache(maxlen=max_users)
+        self.bypass_ids = bypass_ids or set()
+        self._users: LRUCache = LRUCache(maxlen=max_users, ttl=period)
         self.logger = logging.getLogger(__name__)
 
     async def __call__(self, handler, event: TelegramObject, data: Dict):  # type: ignore[override]
         if isinstance(event, Message) and event.from_user:
             user_id = str(event.from_user.id)
+            if user_id in self.bypass_ids:
+                return await handler(event, data)
             now = time.time()
             timestamps: Deque[float] = await self._users.get(user_id, deque())
 

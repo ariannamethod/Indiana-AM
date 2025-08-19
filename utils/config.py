@@ -29,6 +29,7 @@ class Settings:
     RATE_LIMIT_COUNT: int = int(os.getenv("RATE_LIMIT_COUNT", 20))
     RATE_LIMIT_PERIOD: float = float(os.getenv("RATE_LIMIT_PERIOD", 60))
     RATE_LIMIT_DELAY: float = float(os.getenv("RATE_LIMIT_DELAY", 0))
+    DAILY_MSG_LIMIT: int = int(os.getenv("DAILY_MSG_LIMIT", 10))
     VECTOR_STORE_MAX_SIZE: int | None = _get_vector_store_max_size()
     VECTOR_STORE_PATH: str = os.getenv("VECTOR_STORE_PATH", "vector_store.json")
 
