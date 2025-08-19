@@ -3,10 +3,10 @@ import asyncio
 import random
 import logging
 import re
+import os
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from collections import OrderedDict
-from typing import Any
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.utils.chat_action import ChatActionSender
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler
@@ -22,7 +22,7 @@ from utils.config import settings
 from utils import dayandnight
 from utils import knowtheworld
 from utils.genesis1 import run_genesis1
-from utils.genesis2 import genesis2_sonar_filter, assemble_final_reply
+from utils.genesis2 import genesis2_sonar_filter
 from utils.genesis3 import genesis3_deep_dive
 from utils.genesis6 import genesis6_profile_filter
 from utils.deepdiving import perplexity_search
@@ -63,6 +63,10 @@ PINECONE_API_KEY = settings.PINECONE_API_KEY
 PINECONE_INDEX = settings.PINECONE_INDEX
 PINECONE_ENV = settings.PINECONE_ENV
 
+CONTRIBUTOR_CHAT_IDS: set[str] = {
+    cid for cid in os.getenv("CONTRIBUTOR_CHAT_IDS", "").split(",") if cid
+}
+
 # Для webhook
 BASE_WEBHOOK_URL = settings.BASE_WEBHOOK_URL  # URL вашего приложения (для Railway)
 WEBHOOK_PATH = f"/webhook/{TELEGRAM_TOKEN}"
@@ -78,9 +82,9 @@ bot = Bot(token=TELEGRAM_TOKEN)
 dp = Dispatcher()
 dp.message.middleware(
     RateLimitMiddleware(
-        settings.RATE_LIMIT_COUNT,
-        settings.RATE_LIMIT_PERIOD,
-        settings.RATE_LIMIT_DELAY,
+        limit=settings.DAILY_MSG_LIMIT,
+        window=86400,
+        bypass_ids={CREATOR_CHAT} | CONTRIBUTOR_CHAT_IDS,
     )
 )
 
