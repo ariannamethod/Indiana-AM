@@ -76,7 +76,7 @@ async def badass_indiana_chat(prompt: str, lang: str = "en") -> str:
     )
     payload = {
         "model": "grok-3",
-        "temperature": 0.8,
+        "temperature": 0.9,
         "max_tokens": 200,
         "messages": [
             {"role": "system", "content": system_prompt},
