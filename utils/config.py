@@ -1,5 +1,6 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import os
+import re
 
 def _get_vector_store_max_size() -> int | None:
     value = os.getenv("VECTOR_STORE_MAX_SIZE")
@@ -25,6 +26,7 @@ class Settings:
     AGENT_GROUP: str = os.getenv("AGENT_GROUP_ID", "-1001234567890")
     GROUP_CHAT: str = os.getenv("GROUP_CHAT", "")
     CREATOR_CHAT: str = os.getenv("CREATOR_CHAT", "")
+    CONTRIBUTOR_CHAT_IDS: list[str] = field(default_factory=list)
     PPLX_API_KEY: str = os.getenv("PPLX_API_KEY", os.getenv("PERPLEXITY_API_KEY", ""))
     RATE_LIMIT_COUNT: int = int(os.getenv("RATE_LIMIT_COUNT", 20))
     RATE_LIMIT_PERIOD: float = float(os.getenv("RATE_LIMIT_PERIOD", 60))
@@ -44,5 +46,12 @@ class Settings:
                 "Missing required environment variables: " + ", ".join(missing)
             )
 
+# Collect contributor chat IDs before instantiating settings
+_contrib_pattern = re.compile(r"^CONTRIBUTOR_CHAT\d+$")
+_contrib_ids = [
+    os.environ[key]
+    for key in sorted(os.environ)
+    if _contrib_pattern.match(key) and os.environ[key]
+]
 
-settings = Settings()
+settings = Settings(CONTRIBUTOR_CHAT_IDS=_contrib_ids)

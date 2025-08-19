@@ -22,7 +22,7 @@ from utils.config import settings
 from utils import dayandnight
 from utils import knowtheworld
 from utils.genesis1 import run_genesis1
-from utils.genesis2 import genesis2_sonar_filter
+from utils.genesis2 import genesis2_sonar_filter, assemble_final_reply  # noqa: F401
 from utils.genesis3 import genesis3_deep_dive
 from utils.genesis6 import genesis6_profile_filter
 from utils.deepdiving import perplexity_search
@@ -62,10 +62,7 @@ CREATOR_CHAT = settings.CREATOR_CHAT
 PINECONE_API_KEY = settings.PINECONE_API_KEY
 PINECONE_INDEX = settings.PINECONE_INDEX
 PINECONE_ENV = settings.PINECONE_ENV
-
-CONTRIBUTOR_CHAT_IDS: set[str] = {
-    cid for cid in os.getenv("CONTRIBUTOR_CHAT_IDS", "").split(",") if cid
-}
+CONTRIBUTOR_CHAT_IDS: set[str] = set(settings.CONTRIBUTOR_CHAT_IDS)
 
 # Для webhook
 BASE_WEBHOOK_URL = settings.BASE_WEBHOOK_URL  # URL вашего приложения (для Railway)
