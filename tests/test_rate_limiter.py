@@ -45,7 +45,10 @@ async def test_rate_limiter_logs_exceed(caplog):
         await middleware(handler, message, {})
         await middleware(handler, message, {})
 
-    assert any("Rate limit exceeded" in r.message for r in caplog.records)
+    assert any(
+        r.message == "Rate limit exceeded: user=1, limit=1/60s"
+        for r in caplog.records
+    )
 
 
 @pytest.mark.asyncio

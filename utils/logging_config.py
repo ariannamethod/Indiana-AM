@@ -16,7 +16,7 @@ def setup_logging() -> None:
         LOG_FILE, when="W0", backupCount=8, encoding="utf-8"
     )
     formatter = logging.Formatter(
-        "%(asctime)s %(levelname)s %(name)s: %(message)s"
+        "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
     )
     handler.setFormatter(formatter)
 

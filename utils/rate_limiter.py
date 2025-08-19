@@ -49,7 +49,12 @@ class RateLimitMiddleware(BaseMiddleware):
                 timestamps.popleft()
 
             if len(timestamps) >= self.limit:
-                self.logger.warning("Rate limit exceeded for user %s", user_id)
+                self.logger.warning(
+                    "Rate limit exceeded: user=%s, limit=%d/%ds",
+                    user_id,
+                    self.limit,
+                    self.window,
+                )
                 if self.delay > 0:
                     await asyncio.sleep(self.delay)
                     return await handler(event, data)
